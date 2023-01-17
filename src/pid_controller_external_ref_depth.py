@@ -18,7 +18,7 @@ from geometry_msgs.msg import PoseStamped
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 
-class P_Controller(object):
+class PID_Controller(object):
 
     # Main loop
     def __init__(self, name):
@@ -198,41 +198,12 @@ class P_Controller(object):
 
     # Controller
     def computeControlAction(self):
-        # Sliding Mode Control for Depth First control
-        u = np.array([0., 0., 0., 0., 50.])
-        epsDepth = 0.2 # offset for depth control
-        epsPitch = 0.05 # offset for pitch control
-
-        while ((np.abs(self.current_x[2] - self.ref[2]) > epsDepth) and \
-            (np.abs(self.current_x[4] - self.ref[4]) > epsPitch)):
-            Kp = np.array([40, 10, 10, 100, 1000])        # P control gain
-            Ki = np.array([0.5, 0.1, 0.1, 0.5, 10])                # I control gain
-            Kd = np.array([1., 1., 1., 1., 1.])
-            u = np.array([0., 0., 0., 0., 0.])
-
-            self.errPrev = self.err
-            self.err = self.ref - self.current_x
-            self.integral += self.err * (1/self.loop_freq)
-            self.deriv = (self.err - self.errPrev) * (self.loop_freq)
-
-            u[3] = Kp[3]*self.err[2] + Ki[3]*self.integral[2]   # PI control vbs
-            u[4] = Kp[4]*self.err[4] + Ki[4]*self.integral[4]   # PI control lcg
-
-            return u
-
-        u = self.computePIDControlAction()
-
-        return u
-
-
-
-    def computePIDControlAction(self):
         # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
         # x = [x, y, z, roll, pitch, yaw]
 
-        Kp = np.array([20, 10, 10, 100, 1000])        # P control gain
-        Ki = np.array([0.5, 0.1, 0.1, 0.5, 10])                # I control gain
-        Kd = np.array([1., 1., 1., 1., 1.])
+        Kp = np.array([40, 10, 10, 100, 10])        # P control gain
+        Ki = np.array([0.5, 0.1, 0.1, 0.5, 1])                # I control gain
+        Kd = np.array([1., 1., 1., 1., 1.])     # D control gain
         u = np.array([0., 0., 0., 0., 0.])
 
         self.errPrev = self.err
@@ -258,17 +229,15 @@ class P_Controller(object):
         # np.clip(uLimited[1], -0.15, 0.15)
         # np.clip(uLimited[2], 0, 100, out = uLimited[2])
 
-        # vbs limit
+        if uLimited[2] > 100:
+            uLimited[2] = 100
+        if uLimited[2] < 0:
+            uLimited[2] = 0
+
         if uLimited[3] > 100:
             uLimited[3] = 100
         if uLimited[3] < 0:
             uLimited[3] = 0
-
-        # lcg limit
-        if uLimited[4] > 100:
-            uLimited[4] = 100
-        if uLimited[4] < 0:
-            uLimited[4] = 0
 
         # np.clip(uLimited[3], 0, 100)
 
@@ -283,5 +252,5 @@ class P_Controller(object):
         return uLimited
 
 if __name__ == "__main__":
-    rospy.init_node("p_controller")
-    controller = P_Controller(rospy.get_name())
+    rospy.init_node("pid_controller")
+    controller = PID_Controller(rospy.get_name())

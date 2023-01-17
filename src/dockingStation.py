@@ -35,22 +35,22 @@ class DockingStation(object):
             rate.sleep()
 
     def publishPose(self):
-        # Pose in NED
+        # Pose in ENU
         pose = PoseStamped()
 
         pose.header.stamp = rospy.Time.now()
         pose.header.frame_id = "docking_station"
 
-        pose.pose.position.x = 20.0
-        pose.pose.position.y = 0.0
-        pose.pose.position.z = 1.5
+        pose.pose.position.x = 0.0
+        pose.pose.position.y = 20.0
+        pose.pose.position.z = -1.5
 
 
-        roll = 0
+        roll = 0 
         pitch = 0
-        yaw = 0
+        yaw = 0 
 
-        quaternion = quaternion_from_euler(roll, pitch, yaw)
+        quaternion = quaternion_from_euler(roll, pitch, yaw, 'sxyz')
 
         pose.pose.orientation.x = quaternion[1]
         pose.pose.orientation.y = quaternion[2]
