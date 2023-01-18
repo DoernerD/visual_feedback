@@ -199,38 +199,45 @@ class P_Controller(object):
     # Controller
     def computeControlAction(self):
         # Sliding Mode Control for Depth First control
-        u = np.array([0., 0., 0., 0., 50.])
+        # u = np.array([0., 0., 0., 0., 50.])
         epsDepth = 0.2 # offset for depth control
         epsPitch = 0.05 # offset for pitch control
 
-        while ((np.abs(self.current_x[2] - self.ref[2]) > epsDepth) and \
-            (np.abs(self.current_x[4] - self.ref[4]) > epsPitch)):
-            Kp = np.array([40, 10, 10, 100, 1000])        # P control gain
-            Ki = np.array([0.5, 0.1, 0.1, 0.5, 10])                # I control gain
-            Kd = np.array([1., 1., 1., 1., 1.])
-            u = np.array([0., 0., 0., 0., 0.])
+        while ((np.abs(self.current_x[2] - self.ref[2]) >= epsDepth) and \
+            (np.abs(self.current_x[4] - self.ref[4]) >= epsPitch)):
 
-            self.errPrev = self.err
-            self.err = self.ref - self.current_x
-            self.integral += self.err * (1/self.loop_freq)
-            self.deriv = (self.err - self.errPrev) * (self.loop_freq)
-
-            u[3] = Kp[3]*self.err[2] + Ki[3]*self.integral[2]   # PI control vbs
-            u[4] = Kp[4]*self.err[4] + Ki[4]*self.integral[4]   # PI control lcg
-
+            u = self.computeDepthControlAction()
             return u
-
+            
         u = self.computePIDControlAction()
-
         return u
 
+    def computeDepthControlAction(self):
+        # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
+        # x = [x, y, z, roll, pitch, yaw]  
+        u = np.array([0., 0., 0., 0., 50.])
+
+        Kp = np.array([40, 10, 10, 100, 1000])        # P control gain
+        Ki = np.array([0.5, 0.1, 0.1, 5, 10])       # I control gain
+        Kd = np.array([1., 1., 1., 1., 1.])
+        u = np.array([0., 0., 0., 0., 0.])
+
+        self.errPrev = self.err
+        self.err = self.ref - self.current_x
+        self.integral += self.err * (1/self.loop_freq)
+        self.deriv = (self.err - self.errPrev) * (self.loop_freq)
+
+        u[3] = Kp[3]*self.err[2] + Ki[3]*self.integral[2]   # PI control vbs
+        u[4] = Kp[4]*self.err[4] + Ki[4]*self.integral[4]   # PI control lcg
+
+        return u
 
 
     def computePIDControlAction(self):
         # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
         # x = [x, y, z, roll, pitch, yaw]
 
-        Kp = np.array([20, 10, 10, 100, 1000])        # P control gain
+        Kp = np.array([10, 10, 10, 100, 1000])        # P control gain
         Ki = np.array([0.5, 0.1, 0.1, 0.5, 10])                # I control gain
         Kd = np.array([1., 1., 1., 1., 1.])
         u = np.array([0., 0., 0., 0., 0.])
@@ -243,6 +250,9 @@ class P_Controller(object):
         u[0] = (Kp[0]*self.err[0] + Ki[0]*self.integral[0] \
             + Kp[0]*self.err[1] + Ki[0]*self.integral[1] \
             + Kd[0]*self.deriv[0] + Kd[0]*self.deriv[1])    # PID control thrusters
+        # u[0] = (Kp[0]*self.err[0] \
+        #     + Ki[0]*self.integral[0] \
+        #     + Kd[0]*self.deriv[0])    # PID control thrusters
         u[1] = Kp[1]*self.err[5] + Ki[1]*self.integral[5]   # PI control vectoring (horizontal)
         u[2] = self.vecVerticalNeutral #Kp[2]*self.err[2] + Ki[2]*self.integral[2]   # PI control vectoring (vertical)
         u[3] = Kp[3]*self.err[2] + Ki[3]*self.integral[2]   # PI control vbs
