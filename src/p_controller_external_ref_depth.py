@@ -50,7 +50,7 @@ class P_Controller(object):
         self.vecPub = rospy.Publisher(thrust_vector_cmd_topic, ThrusterAngles, queue_size=10)
         self.vbsPub = rospy.Publisher(vbs_topic, PercentStamped, queue_size=10)
         self.lcgPub = rospy.Publisher(lcg_topic, PercentStamped, queue_size=10)
-
+ 
         self.posePub = rospy.Publisher(samPoseTopic, PoseStamped, queue_size=10)
 
         self.control_error_pub = rospy.Publisher(control_error_topic, Float64, queue_size=10)
@@ -73,9 +73,13 @@ class P_Controller(object):
         self.errPrev = np.array([0., 0., 0., 0., 0., 0.])
         self.integral = np.array([0., 0., 0., 0., 0., 0.])
 
+        self.distanceErr = 0.
+        self.distanceErrPrev = 0.
+        self.distanceErrInt = 0.
+
         # Neutral actuator inputs
         self.vbsNeutral = 50
-        self.lcgNeutral = 0
+        self.lcgNeutral = 50
         self.thrusterNeutral = 0
         self.vecHorizontalNeutral = 0
         self.vecVerticalNeutral = 0
@@ -84,6 +88,7 @@ class P_Controller(object):
         while not rospy.is_shutdown():
 
             u = self.computeControlAction()
+
             uLimited = self.limitControlAction(u)
 
             self.publishPose()
@@ -181,8 +186,8 @@ class P_Controller(object):
         thruster2.rpm = u[0]
         vec.thruster_horizontal_radians = u[1] 
         vec.thruster_vertical_radians = u[2]
-        vbs.value = u[3]
-        lcg.value = u[4]
+        vbs.value = int(u[3])
+        lcg.value = int(u[4])
 
         # Publish to actuators
         self.rpm1Pub.publish(thruster1)
@@ -203,13 +208,16 @@ class P_Controller(object):
         epsDepth = 0.2 # offset for depth control
         epsPitch = 0.05 # offset for pitch control
 
-        while ((np.abs(self.current_x[2] - self.ref[2]) >= epsDepth) and \
-            (np.abs(self.current_x[4] - self.ref[4]) >= epsPitch)):
+        while ((np.abs(self.current_x[2] - self.ref[2]) >= epsDepth) and (np.abs(self.current_x[4] - self.ref[4]) >= epsPitch)):
 
             u = self.computeDepthControlAction()
             return u
             
         u = self.computePIDControlAction()
+
+
+        # u = self.computeDepthControlAction()
+
         return u
 
     def computeDepthControlAction(self):
@@ -217,10 +225,9 @@ class P_Controller(object):
         # x = [x, y, z, roll, pitch, yaw]  
         u = np.array([0., 0., 0., 0., 50.])
 
-        Kp = np.array([40, 10, 10, 100, 1000])        # P control gain
-        Ki = np.array([0.5, 0.1, 0.1, 5, 10])       # I control gain
+        Kp = np.array([40, 10, 10, 150, 1000])        # P control gain
+        Ki = np.array([0.5, 0.1, 0.1, 3, 10])       # I control gain
         Kd = np.array([1., 1., 1., 1., 1.])
-        u = np.array([0., 0., 0., 0., 0.])
 
         self.errPrev = self.err
         self.err = self.ref - self.current_x
@@ -228,7 +235,7 @@ class P_Controller(object):
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
         u[3] = Kp[3]*self.err[2] + Ki[3]*self.integral[2]   # PI control vbs
-        u[4] = Kp[4]*self.err[4] + Ki[4]*self.integral[4]   # PI control lcg
+        u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
 
         return u
 
@@ -237,36 +244,50 @@ class P_Controller(object):
         # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
         # x = [x, y, z, roll, pitch, yaw]
 
-        Kp = np.array([10, 10, 10, 100, 1000])        # P control gain
-        Ki = np.array([0.5, 0.1, 0.1, 0.5, 10])                # I control gain
+        # Gains for distance based error
+        Kp = np.array([10, 10, 10, 150, 1000])        # P control gain
+        Ki = np.array([0.5, 0.1, 0.1, 3, 10])                # I control gain
         Kd = np.array([1., 1., 1., 1., 1.])
-        u = np.array([0., 0., 0., 0., 0.])
 
-        self.errPrev = self.err
+        # Gains for x, y thruster error
+        # Kp = np.array([10, 10, 10, 100, 10])        # P control gain
+        # Ki = np.array([0.5, 0.1, 0.1, 0.5, 0.5])                # I control gain
+        # Kd = np.array([1., 1., 1., 1., 1.])
+        u = np.array([0., 0., 0., 0., 50.])
+
+        self.errPrev = self.err.copy()
         self.err = self.ref - self.current_x
+
+        self.distanceErrPrev = self.distanceErr
+        self.distanceErr = np.sqrt(self.err[0]**2 + self.err[1]**2)
+        self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
+        self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq
+
         self.integral += self.err * (1/self.loop_freq)
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
-        u[0] = (Kp[0]*self.err[0] + Ki[0]*self.integral[0] \
-            + Kp[0]*self.err[1] + Ki[0]*self.integral[1] \
-            + Kd[0]*self.deriv[0] + Kd[0]*self.deriv[1])    # PID control thrusters
+        # Change this to an distance based error, i.e. the vector norm!
+        # -> Then you don't need to mess with the signs if the error in x-dir is pos
+        #    and the error in y-dir is neg or so. 
+        u[0] = (Kp[0]*self.distanceErr \
+            + Ki[0]*self.distanceErrInt \
+            + Kd[0]*self.distanceErrDeriv)    # PID control thrusters
+        # u[0] = (Kp[0]*self.err[0] + Ki[0]*self.integral[0] \
+        #     + Kp[0]*self.err[1] + Ki[0]*self.integral[1] \
+        #     + Kd[0]*self.deriv[0] + Kd[0]*self.deriv[1])    # PID control thrusters
         # u[0] = (Kp[0]*self.err[0] \
         #     + Ki[0]*self.integral[0] \
         #     + Kd[0]*self.deriv[0])    # PID control thrusters
-        u[1] = Kp[1]*self.err[5] + Ki[1]*self.integral[5]   # PI control vectoring (horizontal)
-        u[2] = self.vecVerticalNeutral #Kp[2]*self.err[2] + Ki[2]*self.integral[2]   # PI control vectoring (vertical)
+        u[1] = -(Kp[1]*self.err[5] + Ki[1]*self.integral[5])   # PI control vectoring (horizontal)
+        u[2] = -(Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
         u[3] = Kp[3]*self.err[2] + Ki[3]*self.integral[2]   # PI control vbs
-        u[4] = Kp[4]*self.err[4] + Ki[4]*self.integral[4]   # PI control lcg
+        u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
 
         return u
 
     def limitControlAction(self,u):
         # Enforce hardware limits on actuator control
-        uLimited = u
-
-        # np.clip(uLimited[0], -2000, 2000)
-        # np.clip(uLimited[1], -0.15, 0.15)
-        # np.clip(uLimited[2], 0, 100, out = uLimited[2])
+        uLimited = u.copy()     # without .copy(), python only makes a shallow copy of the array.
 
         # vbs limit
         if uLimited[3] > 100:
@@ -280,14 +301,15 @@ class P_Controller(object):
         if uLimited[4] < 0:
             uLimited[4] = 0
 
-        # np.clip(uLimited[3], 0, 100)
 
         print("[x, y, z, roll, pitch, yaw]")
         print("Current States: ", np.around(self.current_x, decimals=3))
         print("Reference States: ", np.around(self.ref, decimals=3))
         print("Control Error:", np.around(self.err, decimals=3))
+        print("Distance Error: ", np.around(self.distanceErr, decimals=3))
         print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
-        print("Control Input:", np.around(uLimited, decimals=3))
+        print("Control Input raw:", np.around(u, decimals=3))
+        print("Control Input lim:", np.around(uLimited, decimals=3))
         print("")
 
         return uLimited
