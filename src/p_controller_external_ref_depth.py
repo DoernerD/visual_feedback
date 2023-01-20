@@ -4,6 +4,7 @@
 from __future__ import division, print_function
 
 import numpy as np
+import math
 
 import rospy
 from rospy.numpy_msg import numpy_msg
@@ -99,7 +100,7 @@ class P_Controller(object):
 
     #region Call-backs
     def feedback_cb(self, odom_fb):
-        [self.current_x,self.current_y] = self.getStateFeedback(odom_fb)
+        [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
 
     def refPoseCb(self, pose):
         # Pose in ENU 
@@ -204,19 +205,26 @@ class P_Controller(object):
     # Controller
     def computeControlAction(self):
         # Sliding Mode Control for Depth First control
-        # u = np.array([0., 0., 0., 0., 50.])
         epsDepth = 0.2 # offset for depth control
         epsPitch = 0.05 # offset for pitch control
 
-        while ((np.abs(self.current_x[2] - self.ref[2]) >= epsDepth) and (np.abs(self.current_x[4] - self.ref[4]) >= epsPitch)):
+        ## THIS DOESN'T WORK! 
+        # There needs to be a different way to implement breaking when approaching the docking
+        # station. The idea is to reverse the RPM to get some breaking force.
+        # if self.velocities[0] != 0:
+        #     if np.abs(self.distanceErr) < 0.5:
+        #         u = np.array([0., 0., 0., 0., 50.])
 
+        #         u[0] = -np.sign(self.distanceErr)*500
+        #         return u
+
+        # Not sure if the condition works correctly...
+        while ((np.abs(self.current_x[2] - self.ref[2]) >= epsDepth) and (np.abs(self.current_x[4] - self.ref[4]) >= epsPitch)):
             u = self.computeDepthControlAction()
             return u
+
             
         u = self.computePIDControlAction()
-
-
-        # u = self.computeDepthControlAction()
 
         return u
 
@@ -246,38 +254,27 @@ class P_Controller(object):
 
         # Gains for distance based error
         Kp = np.array([10, 10, 10, 150, 1000])        # P control gain
-        Ki = np.array([0.5, 0.1, 0.1, 3, 10])                # I control gain
+        Ki = np.array([1, 0.1, 0.1, 3, 10])                # I control gain
         Kd = np.array([1., 1., 1., 1., 1.])
 
-        # Gains for x, y thruster error
-        # Kp = np.array([10, 10, 10, 100, 10])        # P control gain
-        # Ki = np.array([0.5, 0.1, 0.1, 0.5, 0.5])                # I control gain
-        # Kd = np.array([1., 1., 1., 1., 1.])
         u = np.array([0., 0., 0., 0., 50.])
 
+        # Error calculation
         self.errPrev = self.err.copy()
         self.err = self.ref - self.current_x
-
-        self.distanceErrPrev = self.distanceErr
-        self.distanceErr = np.sqrt(self.err[0]**2 + self.err[1]**2)
-        self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
-        self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq
-
         self.integral += self.err * (1/self.loop_freq)
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
-        # Change this to an distance based error, i.e. the vector norm!
-        # -> Then you don't need to mess with the signs if the error in x-dir is pos
-        #    and the error in y-dir is neg or so. 
+        # Calculate distance to reference pose
+        self.distanceErrPrev = self.distanceErr
+        self.distanceErr = np.sqrt(self.err[0]**2 + self.err[1]**2) * np.sign(math.atan2(self.err[0], self.err[1]))
+        self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
+        self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq        
+
+        # Controller
         u[0] = (Kp[0]*self.distanceErr \
             + Ki[0]*self.distanceErrInt \
             + Kd[0]*self.distanceErrDeriv)    # PID control thrusters
-        # u[0] = (Kp[0]*self.err[0] + Ki[0]*self.integral[0] \
-        #     + Kp[0]*self.err[1] + Ki[0]*self.integral[1] \
-        #     + Kd[0]*self.deriv[0] + Kd[0]*self.deriv[1])    # PID control thrusters
-        # u[0] = (Kp[0]*self.err[0] \
-        #     + Ki[0]*self.integral[0] \
-        #     + Kd[0]*self.deriv[0])    # PID control thrusters
         u[1] = -(Kp[1]*self.err[5] + Ki[1]*self.integral[5])   # PI control vectoring (horizontal)
         u[2] = -(Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
         u[3] = Kp[3]*self.err[2] + Ki[3]*self.integral[2]   # PI control vbs

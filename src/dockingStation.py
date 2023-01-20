@@ -42,7 +42,7 @@ class DockingStation(object):
         pose.header.frame_id = "docking_station"
 
         pose.pose.position.x = 0.0
-        pose.pose.position.y = 20.0
+        pose.pose.position.y = 10.0  #20.0
         pose.pose.position.z = -1.5
 
 
