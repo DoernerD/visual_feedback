@@ -113,10 +113,10 @@ class P_Controller(object):
         eta2 = pose.pose.orientation.y
         eta3 = pose.pose.orientation.z
 
-        rpy = euler_from_quaternion([eta1,eta2,eta3,eta0])
+        rpy = euler_from_quaternion([eta0,eta1,eta2,eta3],'sxyz')
         roll = rpy[0]
         pitch = rpy[1]
-        yaw = (np.pi - rpy[2])
+        yaw = rpy[2]
 
         self.refRoll = roll
         self.refPitch = pitch
