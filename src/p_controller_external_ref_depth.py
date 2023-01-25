@@ -103,30 +103,48 @@ class P_Controller(object):
         [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
 
     def refPoseCb(self, pose):
+        # Pose is in ENU. The callback extracts the position and Euler angles and subsequently transforms it in NED for internal use.
+        #
         # Pose in ENU 
-        self.refX = pose.pose.position.y
-        self.refY = pose.pose.position.x
-        self.refZ = -pose.pose.position.z
+        xENU = pose.pose.position.x
+        yENU = pose.pose.position.y
+        zENU = pose.pose.position.z
 
-        eta0 = pose.pose.orientation.w
-        eta1 = pose.pose.orientation.x
-        eta2 = pose.pose.orientation.y
-        eta3 = pose.pose.orientation.z
+        eta0ENU = pose.pose.orientation.w
+        eta1ENU = pose.pose.orientation.x
+        eta2ENU = pose.pose.orientation.y
+        eta3ENU = pose.pose.orientation.z
+        
+        rpyENU = euler_from_quaternion([eta0ENU,eta1ENU,eta2ENU,eta3ENU],'sxyz')
+        rollENU = rpyENU[0]
+        pitchENU = rpyENU[1]
+        yawENU = rpyENU[2]
+        
+        # Transform ENU -> NED
+        # Swapping axes:
+        #   xENU -> yNED
+        #   yENU -> xNED
+        #   zENU -> -zNED
+        self.refX = yENU
+        self.refY = xENU
+        self.refZ = -zENU
 
-        rpy = euler_from_quaternion([eta0,eta1,eta2,eta3],'sxyz')
-        roll = rpy[0]
-        pitch = rpy[1]
-        yaw = rpy[2]
+        # Changing angles:
+        #   roll and pitch remain
+        #   yawNED = -yawENU + 90deg (because axis flipped (-) and we rotate by 90deg to keep the other angles the same)
+        rollNED = rollENU
+        pitchNED = pitchENU
+        yawNED = np.pi/2-yawENU
 
-        self.refRoll = roll
-        self.refPitch = pitch
-        self.refYaw = yaw
+        self.refRoll = rollNED
+        self.refPitch = pitchNED
+        self.refYaw = yawNED
 
         self.ref = np.array([self.refX, self.refY, self.refZ, self.refRoll, self.refPitch, self.refYaw])
 
     def getStateFeedback(self, odom_msg):
         # Note: The callbacks are necessary, but we can define them ourselves.
-        # # Converting from ENU to NED, e.g. see https://www.programmersought.com/article/83764943652/ or https://robotics.stackexchange.com/questions/19669/rotating-ned-to-enu
+        # # Converting from ENU to NED, e.g. see https://www.programmersought.com/article/83764943652/ or # https://robotics.stackexchange.com/questions/19669/rotating-ned-to-enu
         # that is why we switch y and x, rotate the yaw by 90 degrees and have the opposite sign on z.
         x =  odom_msg.pose.pose.position.y
         y =  odom_msg.pose.pose.position.x
@@ -136,10 +154,10 @@ class P_Controller(object):
         eta2 = odom_msg.pose.pose.orientation.y
         eta3 = odom_msg.pose.pose.orientation.z
 
-        rpy   = euler_from_quaternion([eta1,eta2,eta3,eta0])
+        rpy   = euler_from_quaternion([eta0,eta1,eta2,eta3],'sxyz')
         roll  = rpy[0]
         pitch = rpy[1]
-        yaw   = (np.pi/2-rpy[2])
+        yaw   = np.pi/2-rpy[2]
 
         # Velocities
         u =  odom_msg.twist.twist.linear.y
@@ -149,10 +167,10 @@ class P_Controller(object):
         q =  odom_msg.twist.twist.angular.y
         r = -odom_msg.twist.twist.angular.z
 
-        current_state  = np.array([x,y,z,roll,pitch,yaw]) 
-        current_output = np.array([x,z,pitch,u,w,q])
+        state  = np.array([x,y,z,roll,pitch,yaw]) 
+        velocity = np.array([u,v,w,p,q,r])
 
-        return [current_state, current_output]
+        return [state, velocity]
     #endregion
 
     #region Publisher
@@ -298,7 +316,7 @@ class P_Controller(object):
         if uLimited[4] < 0:
             uLimited[4] = 0
 
-
+        print("All in NED:")
         print("[x, y, z, roll, pitch, yaw]")
         print("Current States: ", np.around(self.current_x, decimals=3))
         print("Reference States: ", np.around(self.ref, decimals=3))
