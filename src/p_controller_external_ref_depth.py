@@ -42,8 +42,8 @@ class P_Controller(object):
         ref_pose_topic = rospy.get_param("~ref_pose_topic", "/dockingStation/pose")
 
         # Subscribers to state feedback, setpoints and enable flags
-        rospy.Subscriber(state_feedback_topic, Odometry, self.feedback_cb)
-        rospy.Subscriber(ref_pose_topic, PoseStamped, self.refPoseCb)
+        rospy.Subscriber(state_feedback_topic, Odometry, self.feedbackCallback)
+        rospy.Subscriber(ref_pose_topic, PoseStamped, self.poseCallback)
 
         # Publisher to actuators
         self.rpm1Pub = rospy.Publisher(rpm1_topic, ThrusterRPM, queue_size=10)
@@ -99,11 +99,15 @@ class P_Controller(object):
 
 
     #region Call-backs
-    def feedback_cb(self, odom_fb):
-        [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
+    def feedbackCallback(self, odom_fb):
+        # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
+        self.current_x = self.getEulerFromQuaternion(odom_fb.pose,'xyzs')
 
-    def refPoseCb(self, pose):
-        # Pose is in ENU. The callback extracts the position and Euler angles and subsequently transforms it in NED for internal use.
+    def poseCallback(self,pose):
+        self.ref = self.getEulerFromQuaternion(pose,'sxyz')
+
+    def getEulerFromQuaternion(self, pose, order):
+        # Pose is in ENU. The callback extracts the position and Euler angles.
         #
         # Pose in ENU 
         xENU = pose.pose.position.x
@@ -115,62 +119,94 @@ class P_Controller(object):
         eta2ENU = pose.pose.orientation.y
         eta3ENU = pose.pose.orientation.z
         
-        rpyENU = euler_from_quaternion([eta0ENU,eta1ENU,eta2ENU,eta3ENU],'sxyz')
+        # for some reason the odom pose uses a different order for the euler-quaternion transformation. The else statement should be the default.
+        if order is 'xyzs':
+            rpyENU = euler_from_quaternion([eta1ENU,eta2ENU,eta3ENU,eta0ENU])
+        else:
+            rpyENU = euler_from_quaternion([eta0ENU,eta1ENU,eta2ENU,eta3ENU],'sxyz')
+
+
         rollENU = rpyENU[0]
         pitchENU = rpyENU[1]
         yawENU = rpyENU[2]
+
+        states = np.array([xENU, yENU, zENU, rollENU, pitchENU, yawENU])
+
+        return states
+    #endregion
+
+    #region ENU-NED transform
+    # def refPoseCb(self, pose):
+    #     # Pose is in ENU. The callback extracts the position and Euler angles and subsequently transforms it in NED for internal use.
+    #     #
+    #     # Pose in ENU 
+    #     xENU = pose.pose.position.x
+    #     yENU = pose.pose.position.y
+    #     zENU = pose.pose.position.z
+
+    #     eta0ENU = pose.pose.orientation.w
+    #     eta1ENU = pose.pose.orientation.x
+    #     eta2ENU = pose.pose.orientation.y
+    #     eta3ENU = pose.pose.orientation.z
         
-        # Transform ENU -> NED
-        # Swapping axes:
-        #   xENU -> yNED
-        #   yENU -> xNED
-        #   zENU -> -zNED
-        self.refX = yENU
-        self.refY = xENU
-        self.refZ = -zENU
+    #     rpyENU = euler_from_quaternion([eta0ENU,eta1ENU,eta2ENU,eta3ENU],'sxyz')
+    #     rollENU = rpyENU[0]
+    #     pitchENU = rpyENU[1]
+    #     yawENU = rpyENU[2]
+        
+    #     # Transform ENU -> NED
+    #     # Swapping axes:
+    #     #   xENU -> yNED
+    #     #   yENU -> xNED
+    #     #   zENU -> -zNED
+    #     self.refX = yENU
+    #     self.refY = xENU
+    #     self.refZ = -zENU
 
-        # Changing angles:
-        #   roll and pitch remain
-        #   yawNED = -yawENU + 90deg (because axis flipped (-) and we rotate by 90deg to keep the other angles the same)
-        rollNED = rollENU
-        pitchNED = pitchENU
-        yawNED = np.pi/2-yawENU
+    #     # Changing angles:
+    #     #   roll and pitch remain
+    #     #   yawNED = -yawENU + 90deg (because axis flipped (-) and we rotate by 90deg to keep the other angles the same)
+    #     rollNED = rollENU
+    #     pitchNED = pitchENU
+    #     yawNED = np.pi/2-yawENU
 
-        self.refRoll = rollNED
-        self.refPitch = pitchNED
-        self.refYaw = yawNED
+    #     self.refRoll = rollNED
+    #     self.refPitch = pitchNED
+    #     self.refYaw = yawNED
 
-        self.ref = np.array([self.refX, self.refY, self.refZ, self.refRoll, self.refPitch, self.refYaw])
+    #     self.ref = np.array([self.refX, self.refY, self.refZ, self.refRoll, self.refPitch, self.refYaw])
 
-    def getStateFeedback(self, odom_msg):
-        # Note: The callbacks are necessary, but we can define them ourselves.
-        # # Converting from ENU to NED, e.g. see https://www.programmersought.com/article/83764943652/ or # https://robotics.stackexchange.com/questions/19669/rotating-ned-to-enu
-        # that is why we switch y and x, rotate the yaw by 90 degrees and have the opposite sign on z.
-        x =  odom_msg.pose.pose.position.y
-        y =  odom_msg.pose.pose.position.x
-        z = -odom_msg.pose.pose.position.z
-        eta0 = odom_msg.pose.pose.orientation.w
-        eta1 = odom_msg.pose.pose.orientation.x
-        eta2 = odom_msg.pose.pose.orientation.y
-        eta3 = odom_msg.pose.pose.orientation.z
+    # def getStateFeedback(self, odom_msg):
+    #     # Note: The callbacks are necessary, but we can define them ourselves.
+    #     # # Converting from ENU to NED, e.g. see https://www.programmersought.com/article/83764943652/ or # https://robotics.stackexchange.com/questions/19669/rotating-ned-to-enu
+    #     # that is why we switch y and x, rotate the yaw by 90 degrees and have the opposite sign on z.
+    #     x =  odom_msg.pose.pose.position.y
+    #     y =  odom_msg.pose.pose.position.x
+    #     z = -odom_msg.pose.pose.position.z
+    #     eta0 = odom_msg.pose.pose.orientation.w
+    #     eta1 = odom_msg.pose.pose.orientation.x
+    #     eta2 = odom_msg.pose.pose.orientation.y
+    #     eta3 = odom_msg.pose.pose.orientation.z
 
-        rpy   = euler_from_quaternion([eta0,eta1,eta2,eta3],'sxyz')
-        roll  = rpy[0]
-        pitch = rpy[1]
-        yaw   = np.pi/2-rpy[2]
+    #     rpy   = euler_from_quaternion([eta0,eta1,eta2,eta3],'sxyz')
+    #     roll  = rpy[0]
+    #     pitch = rpy[1]
+    #     yaw   = np.pi/2-rpy[2]
 
-        # Velocities
-        u =  odom_msg.twist.twist.linear.y
-        v =  odom_msg.twist.twist.linear.x
-        w = -odom_msg.twist.twist.linear.z        
-        p =  odom_msg.twist.twist.angular.x
-        q =  odom_msg.twist.twist.angular.y
-        r = -odom_msg.twist.twist.angular.z
+    #     # print("RPY (ENU): ", rpy)
 
-        state  = np.array([x,y,z,roll,pitch,yaw]) 
-        velocity = np.array([u,v,w,p,q,r])
+    #     # Velocities
+    #     u =  odom_msg.twist.twist.linear.y
+    #     v =  odom_msg.twist.twist.linear.x
+    #     w = -odom_msg.twist.twist.linear.z        
+    #     p =  odom_msg.twist.twist.angular.x
+    #     q =  odom_msg.twist.twist.angular.y
+    #     r = -odom_msg.twist.twist.angular.z
 
-        return [state, velocity]
+    #     state  = np.array([x,y,z,roll,pitch,yaw]) 
+    #     velocity = np.array([u,v,w,p,q,r])
+
+    #     return [state, velocity]
     #endregion
 
     #region Publisher
@@ -240,9 +276,9 @@ class P_Controller(object):
         while ((np.abs(self.current_x[2] - self.ref[2]) >= epsDepth) and (np.abs(self.current_x[4] - self.ref[4]) >= epsPitch)):
             u = self.computeDepthControlAction()
             return u
-
-            
+ 
         u = self.computePIDControlAction()
+        # u = self.computeConstVelDepthControlAction()
 
         return u
 
@@ -260,10 +296,37 @@ class P_Controller(object):
         self.integral += self.err * (1/self.loop_freq)
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
-        u[3] = Kp[3]*self.err[2] + Ki[3]*self.integral[2]   # PI control vbs
+        u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
         u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
 
         return u
+
+    def computeConstVelDepthControlAction(self):
+        # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
+        # x = [x, y, z, roll, pitch, yaw]  
+        u = np.array([0., 0., 0., 0., 50.])
+
+        Kp = np.array([40, 10, 10, 150, 1000])        # P control gain
+        Ki = np.array([0.5, 0.1, 0.1, 3, 10])       # I control gain
+        Kd = np.array([1., 1., 1., 1., 1.])
+
+        self.errPrev = self.err
+        self.err = self.ref - self.current_x
+        self.integral += self.err * (1/self.loop_freq)
+        self.deriv = (self.err - self.errPrev) * (self.loop_freq)
+
+        # Calculate distance to reference pose
+        self.distanceErrPrev = self.distanceErr
+        self.distanceErr = np.sqrt(self.err[0]**2 + self.err[1]**2) * np.sign(math.atan2(self.err[0], self.err[1]))
+        self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
+        self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq   
+
+        u[0] = 500
+        u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
+        u[4] = Kp[4]*self.err[4] + Ki[4]*self.integral[4]   # PI control lcg
+
+        return u
+
 
 
     def computePIDControlAction(self):
@@ -285,17 +348,23 @@ class P_Controller(object):
 
         # Calculate distance to reference pose
         self.distanceErrPrev = self.distanceErr
-        self.distanceErr = np.sqrt(self.err[0]**2 + self.err[1]**2) * np.sign(math.atan2(self.err[0], self.err[1]))
+        self.distanceErr = np.sqrt(self.err[0]**2 + self.err[1]**2) * np.sign(math.atan2(self.err[1], self.err[0]))
         self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
         self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq        
 
         # Controller
-        u[0] = (Kp[0]*self.distanceErr \
-            + Ki[0]*self.distanceErrInt \
-            + Kd[0]*self.distanceErrDeriv)    # PID control thrusters
-        u[1] = -(Kp[1]*self.err[5] + Ki[1]*self.integral[5])   # PI control vectoring (horizontal)
-        u[2] = -(Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
-        u[3] = Kp[3]*self.err[2] + Ki[3]*self.integral[2]   # PI control vbs
+        # u[0] = (Kp[0]*self.distanceErr \
+        #     + Ki[0]*self.distanceErrInt \
+        #     + Kd[0]*self.distanceErrDeriv)    # PID control thrusters
+        if np.abs(self.distanceErr) > 1:
+            u[0] = 500
+        # elif self.distanceErr > 0 and self.distanceErr < 1:
+        #     u[0] = -250
+        else:
+            u[0] = 0
+        u[1] = (Kp[1]*self.err[5] + Ki[1]*self.integral[5])   # PI control vectoring (horizontal)
+        u[2] = (Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
+        u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
         u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
 
         return u
@@ -316,7 +385,7 @@ class P_Controller(object):
         if uLimited[4] < 0:
             uLimited[4] = 0
 
-        print("All in NED:")
+        print("All in ENU:")
         print("[x, y, z, roll, pitch, yaw]")
         print("Current States: ", np.around(self.current_x, decimals=3))
         print("Reference States: ", np.around(self.ref, decimals=3))
