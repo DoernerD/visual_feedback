@@ -277,8 +277,8 @@ class P_Controller(object):
             u = self.computeDepthControlAction()
             return u
  
-        u = self.computePIDControlAction()
-        # u = self.computeConstVelDepthControlAction()
+        # u = self.computePIDControlAction()
+        u = self.computeConstVelDepthControlAction()
 
         return u
 
@@ -306,7 +306,7 @@ class P_Controller(object):
         # x = [x, y, z, roll, pitch, yaw]  
         u = np.array([0., 0., 0., 0., 50.])
 
-        Kp = np.array([40, 10, 10, 150, 1000])        # P control gain
+        Kp = np.array([40, 10, 5, 150, 500])        # P control gain
         Ki = np.array([0.5, 0.1, 0.1, 3, 10])       # I control gain
         Kd = np.array([1., 1., 1., 1., 1.])
 
@@ -317,13 +317,21 @@ class P_Controller(object):
 
         # Calculate distance to reference pose
         self.distanceErrPrev = self.distanceErr
-        self.distanceErr = np.sqrt(self.err[0]**2 + self.err[1]**2) * np.sign(math.atan2(self.err[0], self.err[1]))
+        self.distanceErr = np.sqrt(self.err[0]**2 + self.err[1]**2) * np.sign(math.atan2(self.err[1], self.err[0]))
         self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
         self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq   
 
-        u[0] = 500
+        # Going forwards and backwards based on th distance to the target
+        if self.distanceErr > 1:
+            u[0] = 500
+        elif self.distanceErr < -1:
+            u[0] = -500
+        else:
+            u[0] = 0
+        u[1] = (Kp[1]*self.err[5] + Ki[1]*self.integral[5])   # PI control vectoring (horizontal)
+        u[2] = (Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
         u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
-        u[4] = Kp[4]*self.err[4] + Ki[4]*self.integral[4]   # PI control lcg
+        u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
 
         return u
 
@@ -353,15 +361,9 @@ class P_Controller(object):
         self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq        
 
         # Controller
-        # u[0] = (Kp[0]*self.distanceErr \
-        #     + Ki[0]*self.distanceErrInt \
-        #     + Kd[0]*self.distanceErrDeriv)    # PID control thrusters
-        if np.abs(self.distanceErr) > 1:
-            u[0] = 500
-        # elif self.distanceErr > 0 and self.distanceErr < 1:
-        #     u[0] = -250
-        else:
-            u[0] = 0
+        u[0] = (Kp[0]*self.distanceErr \
+            + Ki[0]*self.distanceErrInt \
+            + Kd[0]*self.distanceErrDeriv)    # PID control thrusters    
         u[1] = (Kp[1]*self.err[5] + Ki[1]*self.integral[5])   # PI control vectoring (horizontal)
         u[2] = (Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
         u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
