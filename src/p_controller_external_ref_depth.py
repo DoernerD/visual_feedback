@@ -2,6 +2,7 @@
 # Copyright 2022 David Doerner (ddorner@kth.se)
 
 from __future__ import division, print_function
+import sys
 
 import numpy as np
 import math
@@ -13,10 +14,11 @@ from std_msgs.msg import Float64
 from smarc_msgs.msg import ThrusterRPM
 from sam_msgs.msg import ThrusterAngles, PercentStamped
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 
 
-from tf.transformations import euler_from_quaternion, quaternion_from_euler
+from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_matrix, quaternion_from_matrix
+import tf2_ros
 
 
 class P_Controller(object):
@@ -39,11 +41,13 @@ class P_Controller(object):
         control_error_topic = rospy.get_param("~control_error_topic", "/sam/ctrl/control_error")
         control_input_topic = rospy.get_param("~control_input_topic", "/sam/ctrl/control_input")
 
-        ref_pose_topic = rospy.get_param("~ref_pose_topic", "/dockingStation/pose")
+        # ref_pose_topic = rospy.get_param("~ref_pose_topic", "/dockingStation/pose")
+        ref_pose_topic = rospy.get_param("~ref_pose_topic")
 
         # Subscribers to state feedback, setpoints and enable flags
         rospy.Subscriber(state_feedback_topic, Odometry, self.feedbackCallback)
-        rospy.Subscriber(ref_pose_topic, PoseStamped, self.poseCallback)
+        # rospy.Subscriber(ref_pose_topic, PoseStamped, self.poseCallback)
+        rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
 
         # Publisher to actuators
         self.rpm1Pub = rospy.Publisher(rpm1_topic, ThrusterRPM, queue_size=10)
@@ -93,7 +97,7 @@ class P_Controller(object):
             uLimited = self.limitControlAction(u)
 
             self.publishPose()
-            self.publishControlAction(uLimited)
+            # self.publishControlAction(uLimited)
 
             rate.sleep()
 
@@ -103,9 +107,20 @@ class P_Controller(object):
         # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
         self.current_x = self.getEulerFromQuaternion(odom_fb.pose,'xyzs')
 
-    def poseCallback(self,pose):
-        self.ref = self.getEulerFromQuaternion(pose,'sxyz')
+    def poseCallback(self,estimFB):
+        poseSXYZ = self.getEulerFromQuaternion(estimFB.pose,'skyz')
+        poseXYZS = self.getEulerFromQuaternion(estimFB.pose,'xyzs')
 
+        sys.stdout.write('\n\r')
+        # sys.stdout.write('Number %d %d' % (poseSXYZ[0], poseSXYZ[1]))
+        sys.stdout.write("Current States: %.4f %.4f %.4f %.4f %.4f %.4f\n" % (self.current_x[0], self.current_x[1], self.current_x[2], self.current_x[3], self.current_x[4], self.current_x[5]))
+        sys.stdout.write("poseSXYZ: %.4f %.4f %.4f %.4f %.4f %.4f\n" % (poseSXYZ[0], poseSXYZ[1], poseSXYZ[2], poseSXYZ[3], poseSXYZ[4], poseSXYZ[5]))
+        sys.stdout.write("poseXYZS: %.4f %.4f %.4f %.4f %.4f %.4f\n" % (poseXYZS[0], poseXYZS[1], poseXYZS[2], poseXYZS[3], poseXYZS[4], poseXYZS[5]))
+        # sys.stdout.flush()
+        # sys.stdout.write("poseCB")
+
+        self.ref = self.getEulerFromQuaternion(estimFB.pose,'xyzs')
+    
     def getEulerFromQuaternion(self, pose, order):
         # Pose is in ENU. The callback extracts the position and Euler angles.
         #
@@ -262,6 +277,10 @@ class P_Controller(object):
         epsDepth = 0.2 # offset for depth control
         epsPitch = 0.05 # offset for pitch control
 
+        # enforcing depth and pitch rather than using the docking station estimate.
+        # self.ref[2] = -1.5
+        # self.ref[4] = 0.
+
         ## THIS DOESN'T WORK! 
         # There needs to be a different way to implement breaking when approaching the docking
         # station. The idea is to reverse the RPM to get some breaking force.
@@ -283,6 +302,8 @@ class P_Controller(object):
         return u
 
     def computeDepthControlAction(self):
+        # print("Depth Control")
+
         # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
         # x = [x, y, z, roll, pitch, yaw]  
         u = np.array([0., 0., 0., 0., 50.])
@@ -291,8 +312,12 @@ class P_Controller(object):
         Ki = np.array([0.5, 0.1, 0.1, 3, 10])       # I control gain
         Kd = np.array([1., 1., 1., 1., 1.])
 
+        # self.ref[2] = -1.5
+        # self.ref[4] = 0.
+
         self.errPrev = self.err
         self.err = self.ref - self.current_x
+        # self.err = -self.ref
         self.integral += self.err * (1/self.loop_freq)
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
@@ -302,6 +327,8 @@ class P_Controller(object):
         return u
 
     def computeConstVelDepthControlAction(self):
+        # print("Vel Control")
+
         # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
         # x = [x, y, z, roll, pitch, yaw]  
         u = np.array([0., 0., 0., 0., 50.])
@@ -310,8 +337,16 @@ class P_Controller(object):
         Ki = np.array([0.5, 0.1, 0.1, 3, 10])       # I control gain
         Kd = np.array([1., 1., 1., 1., 1.])
 
+       
+
         self.errPrev = self.err
-        self.err = self.ref - self.current_x
+        # self.err = self.ref - self.current_x
+        self.err = self.ref
+
+        # enforcing depth and pitch
+        # self.err[2] = -1.5 - self.current_x[2]
+        # self.err[4] = 0. - self.current_x[4]
+
         self.integral += self.err * (1/self.loop_freq)
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
@@ -328,8 +363,8 @@ class P_Controller(object):
             u[0] = -500
         else:
             u[0] = 0
-        u[1] = (Kp[1]*self.err[5] + Ki[1]*self.integral[5])   # PI control vectoring (horizontal)
-        u[2] = (Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
+        u[1] = -(Kp[1]*self.err[5] + Ki[1]*self.integral[5])   # PI control vectoring (horizontal)
+        u[2] = -(Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
         u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
         u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
 
@@ -387,16 +422,16 @@ class P_Controller(object):
         if uLimited[4] < 0:
             uLimited[4] = 0
 
-        print("All in ENU:")
-        print("[x, y, z, roll, pitch, yaw]")
-        print("Current States: ", np.around(self.current_x, decimals=3))
-        print("Reference States: ", np.around(self.ref, decimals=3))
-        print("Control Error:", np.around(self.err, decimals=3))
-        print("Distance Error: ", np.around(self.distanceErr, decimals=3))
-        print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
-        print("Control Input raw:", np.around(u, decimals=3))
-        print("Control Input lim:", np.around(uLimited, decimals=3))
-        print("")
+        # print("All in ENU:")
+        # print("[x, y, z, roll, pitch, yaw]")
+        # print("Current States: ", np.around(self.current_x, decimals=3))
+        # print("Reference States: ", np.around(self.ref, decimals=3))
+        # print("Control Error:", np.around(self.err, decimals=3))
+        # print("Distance Error: ", np.around(self.distanceErr, decimals=3))
+        # print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
+        # print("Control Input raw:", np.around(u, decimals=3))
+        # print("Control Input lim:", np.around(uLimited, decimals=3))
+        # print("")
 
         return uLimited
 
