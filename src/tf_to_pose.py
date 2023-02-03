@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     # Frames are kept constant.
     pose = PoseWithCovarianceStamped()
-    pose.header.frame_id = "sam/base_link"
+    pose.header.frame_id = "map" #"sam/base_link"
     # FIXME: Covariance needed?
 
     rate = rospy.Rate(20)
@@ -52,6 +52,9 @@ if __name__ == "__main__":
             rospy.logwarn("Can't find transform: sam to docking_station")
             continue
 
-        sys.stdout.write("Current States: %.4f %.4f %.4f\r" % (pose.pose.pose.position.x, pose.pose.pose.position.y, pose.pose.pose.position.z))
+        sys.stdout.write("Current States: %.4f %.4f %.4f\r" % (
+            pose.pose.pose.position.x,
+            pose.pose.pose.position.y, 
+            pose.pose.pose.position.z))
         pose_pub.publish(pose)
         rate.sleep()

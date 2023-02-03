@@ -15,21 +15,21 @@
 
     
     <!-- Motion Planning Launch-->
-    <arg name="waypoint_topic_arg" default="/waypoint_topic"/>
+    <!-- <arg name="waypoint_topic_arg" default="/waypoint_topic"/>
     <arg name="motion_plan_service_arg" default="/motion_plan_service"/>
-    <arg name="state_topic_arg" default="$(arg state_feedback_topic)"/>
+    <arg name="state_topic_arg" default="$(arg state_feedback_topic)"/> -->
     <!-- <arg name="docking_topic_arg" default="/something4"/> -->
 
-    <arg name="base_frame_arg" default="sam/base_link"/>
+    <!-- <arg name="base_frame_arg" default="sam/base_link"/>
     <arg name="docking_frame_arg" default="docking_station/base_link"/>
-    <arg name="map_frame_arg" default="map"/>
+    <arg name="map_frame_arg" default="map"/> -->
 
     <!-- Nodes -->
-    <node pkg="sam_motion_planning" type="planner.py" name="planner_node" output="screen">
+    <!-- <node pkg="sam_motion_planning" type="planner.py" name="planner_node" output="screen">
         <param name="waypoint_topic_name" value="$(arg waypoint_topic_arg)"/>
         <param name="motion_plan_service_topic_name" value="$(arg motion_plan_service_arg)"/>
         <param name="state_topic_name" value="$(arg state_topic_arg)"/>
-        <!-- <param name="docking_topic_name" value="$(arg docking_topic_arg)"/> -->
+        
 
         <param name="base_frame_name" value="$(arg base_frame_arg)"/>
         <param name="docking_frame_name" value="$(arg docking_frame_arg)"/>
@@ -44,11 +44,11 @@
         <param name="base_frame_name" value="$(arg base_frame_arg)"/>
         <param name="docking_frame_name" value="$(arg docking_frame_arg)"/>
         <param name="map_frame_name" value="$(arg map_frame_arg)"/>
-    </node>
+    </node> -->
 
 
     <!-- Control Launch-->
-    <arg name="ref_pose_topic" default="/waypoint_topic" />
+    <arg name="ref_pose_topic" default="/docking_station/gt/pose" />
 
 
     <!-- Nodes -->

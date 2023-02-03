@@ -19,7 +19,8 @@ from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Pose, Poin
 
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_matrix, quaternion_from_matrix
 import tf
-import tf2_ros
+# import tf2_ros
+# import tf2_geometry_msgs.tf2_geometry_msgs
 
 
 class P_Controller(object):
@@ -47,9 +48,8 @@ class P_Controller(object):
 
         # Subscribers to state feedback, setpoints and enable flags
         rospy.Subscriber(state_feedback_topic, Odometry, self.feedbackCallback)
-        # rospy.Subscriber(ref_pose_topic, PoseStamped, self.poseCallback)
-        # rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
-        rospy.Subscriber(ref_pose_topic, Pose, self.poseCallback)
+        rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
+        # rospy.Subscriber(ref_pose_topic, Pose, self.poseCallback)
 
         # Publisher to actuators
         self.rpm1Pub = rospy.Publisher(rpm1_topic, ThrusterRPM, queue_size=10)
@@ -62,6 +62,13 @@ class P_Controller(object):
 
         self.control_error_pub = rospy.Publisher(control_error_topic, Float64, queue_size=10)
         # self.u_pub = rospy.Publisher(control_input_topic, Float64, queue_size=10)
+
+        # TF tree listener
+        # self.tf_buffer = tf2_ros.Buffer()
+        # self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
+        self.listener = tf.TransformListener()
+
+        self.base_frame = 'sam/base_link'
 
         rate = rospy.Rate(self.loop_freq) 
 
@@ -114,53 +121,31 @@ class P_Controller(object):
         self.current_x = self.getEulerFromQuaternion(odom_fb.pose,'xyzs')
 
     def poseCallback(self,estimFB):
-        # poseSXYZ = self.getEulerFromQuaternion(estimFB.pose,'skyz')
-        # poseXYZS = self.getEulerFromQuaternion(estimFB.pose,'xyzs')
+        # Get way point in map frame
+        # self.ref = self.getEulerFromQuaternion(estimFB.pose,'xyzs')
+        self.ref = np.zeros([6])
 
-        # sys.stdout.write('\n\r')
-        # # sys.stdout.write('Number %d %d' % (poseSXYZ[0], poseSXYZ[1]))
-        # sys.stdout.write("Current States: %.4f %.4f %.4f %.4f %.4f %.4f\n" % (self.current_x[0], self.current_x[1], self.current_x[2], self.current_x[3], self.current_x[4], self.current_x[5]))
-        # sys.stdout.write("poseSXYZ: %.4f %.4f %.4f %.4f %.4f %.4f\n" % (poseSXYZ[0], poseSXYZ[1], poseSXYZ[2], poseSXYZ[3], poseSXYZ[4], poseSXYZ[5]))
-        # sys.stdout.write("poseXYZS: %.4f %.4f %.4f %.4f %.4f %.4f\n" % (poseXYZS[0], poseXYZS[1], poseXYZS[2], poseXYZS[3], poseXYZS[4], poseXYZS[5]))
-        # # sys.stdout.flush()
-        # # sys.stdout.write("poseCB")
+        # Transform waypoint map --> base frame
+        goal_point = PointStamped()
+        goal_point.header.frame_id = 'map'
+        goal_point.header.stamp = rospy.Time(0)
+        goal_point.point.x = estimFB.pose.pose.position.x
+        goal_point.point.y = estimFB.pose.pose.position.y
+        goal_point.point.z = estimFB.pose.pose.position.z
 
-        self.ref = self.getEulerFromQuaternion(estimFB,'xyzs')
-        # self.ref = np.zeros([6])
-
-        # # Transform goal map --> base frame
-        # goal_point = PointStamped()
-        # goal_point.header.frame_id = self.map
-        # goal_point.header.stamp = rospy.Time(0)
-        # goal_point.point.x = estimFB.pose.position.x
-        # goal_point.point.y = estimFB.pose.position.y
-        # goal_point.point.z = estimFB.pose.position.z
-        # try:
-        #     goal_point_local = self.listener.transformPoint(
-        #         self.base_frame, goal_point)
+        try:
+            goal_point_local = self.listener.transformPoint(
+                self.base_frame, goal_point)
             
-        #     self.ref[0] = goal_point_local.point.x
-        #     self.ref[1] = goal_point_local.point.y
-        #     self.ref[2] = goal_point_local.point.z
+            
+            self.ref[0] = goal_point_local.point.x
+            self.ref[1] = goal_point_local.point.y
+            self.ref[2] = goal_point_local.point.z
+        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            rospy.logwarn("Transform to base frame not available yet")
+            pass
 
             
-        #     # #Compute throttle error
-        #     # # throttle_level = min(self.max_throttle, np.linalg.norm(
-        #     # #     np.array([goal_point_local.point.x + goal_point_local.point.y])))
-        #     # # Nacho: no real need to adjust the throttle 
-        #     # throttle_level = self.max_throttle
-        #     # # Compute thrust error
-        #     # alpha = math.atan2(goal_point_local.point.y,
-        #     #                 goal_point_local.point.x)
-        #     # sign = np.copysign(1, alpha)
-        #     # yaw_setpoint = sign * min(self.max_thrust, abs(alpha))
-
-        #     # # Command velocities
-        #     # self.motion_command(throttle_level, yaw_setpoint, 0.)
-
-        # except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-        #     rospy.logwarn("Transform to base frame not available yet")
-        # pass
     
     def getEulerFromQuaternion(self, pose, order):
         # Pose is in ENU. The callback extracts the position and Euler angles.
@@ -319,8 +304,8 @@ class P_Controller(object):
         epsPitch = 0.05 # offset for pitch control
 
         # enforcing depth and pitch rather than using the docking station estimate.
-        # self.ref[2] = -1.5
-        # self.ref[4] = 0.
+        self.ref[2] = -1.5
+        self.ref[4] = 0.
 
         ## THIS DOESN'T WORK! 
         # There needs to be a different way to implement breaking when approaching the docking
@@ -353,12 +338,11 @@ class P_Controller(object):
         Ki = np.array([0.5, 0.1, 0.1, 3, 10])       # I control gain
         Kd = np.array([1., 1., 1., 1., 1.])
 
-        # self.ref[2] = -1.5
-        # self.ref[4] = 0.
+        self.ref[2] = -1.5
+        self.ref[4] = 0.
 
         self.errPrev = self.err
         self.err = self.ref - self.current_x
-        # self.err = -self.ref
         self.integral += self.err * (1/self.loop_freq)
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
@@ -378,38 +362,22 @@ class P_Controller(object):
         Ki = np.array([0.5, 0.1, 0.1, 3, 10])       # I control gain
         Kd = np.array([1., 1., 1., 1., 1.])
 
-        #Compute throttle error
-        # # throttle_level = min(self.max_throttle, np.linalg.norm(
-        # #     np.array([goal_point_local.point.x + goal_point_local.point.y])))
-        # # Nacho: no real need to adjust the throttle 
-        # throttle_level = self.max_throttle
-        # # Compute thrust error
-        # alpha = math.atan2(goal_point_local.point.y,
-        #                 goal_point_local.point.x)
-        # sign = np.copysign(1, alpha)
-        # yaw_setpoint = sign * min(self.max_thrust, abs(alpha))
-
-        # # Command velocities
-        # self.motion_command(throttle_level, yaw_setpoint, 0.)
-
-
         self.errPrev = self.err
         self.err = self.ref - self.current_x
-        # self.err = self.ref
 
         # enforcing depth and pitch
-        # self.err[2] = -1.5 - self.current_x[2]
-        # self.err[4] = 0. - self.current_x[4]
+        self.err[2] = -1.5 - self.current_x[2]
+        self.err[4] = 0. - self.current_x[4]
 
         self.integral += self.err * (1/self.loop_freq)
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
-        self.headingAngle = math.atan2(self.err[1], self.err[0])
+        self.headingAngle = math.atan2(self.ref[1], self.ref[0])
         self.headingAngleInt += 0.#self.headingAngleInt * (1/self.loop_freq)
 
         # Calculate distance to reference pose
         self.distanceErrPrev = self.distanceErr
-        self.distanceErr = np.sqrt(self.err[0]**2 + self.err[1]**2)# * np.sign(self.headingAngle)
+        self.distanceErr = np.sqrt(self.ref[0]**2 + self.ref[1]**2)# * np.sign(self.headingAngle)
         self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
         self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq   
 
@@ -422,9 +390,9 @@ class P_Controller(object):
             u[0] = -500
         else:
             u[0] = 0
-        u[1] = -(Kp[1]*self.err[5] + Ki[1]*self.integral[5])   # PI control vectoring (horizontal)
+        u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt)   # PI control vectoring (horizontal)
         # u[2] = -(Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
-        u[2] = -(Kp[2]*self.headingAngle + Ki[2]*self.headingAngleInt)   # PI control vectoring (vertical)
+        u[2] = -(Kp[2]*self.err[2] + Ki[2]*self.err[2])   # PI control vectoring (vertical)
         u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
         u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
 
@@ -432,39 +400,39 @@ class P_Controller(object):
 
 
 
-    def computePIDControlAction(self):
-        # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
-        # x = [x, y, z, roll, pitch, yaw]
+    # def computePIDControlAction(self):
+    #     # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
+    #     # x = [x, y, z, roll, pitch, yaw]
 
-        # Gains for distance based error
-        Kp = np.array([10, 10, 10, 150, 1000])        # P control gain
-        Ki = np.array([1, 0.1, 0.1, 3, 10])                # I control gain
-        Kd = np.array([1., 1., 1., 1., 1.])
+    #     # Gains for distance based error
+    #     Kp = np.array([10, 10, 10, 150, 1000])        # P control gain
+    #     Ki = np.array([1, 0.1, 0.1, 3, 10])                # I control gain
+    #     Kd = np.array([1., 1., 1., 1., 1.])
 
-        u = np.array([0., 0., 0., 0., 50.])
+    #     u = np.array([0., 0., 0., 0., 50.])
 
-        # Error calculation
-        self.errPrev = self.err.copy()
-        self.err = self.ref - self.current_x
-        self.integral += self.err * (1/self.loop_freq)
-        self.deriv = (self.err - self.errPrev) * (self.loop_freq)
+    #     # Error calculation
+    #     self.errPrev = self.err.copy()
+    #     self.err = self.ref - self.current_x
+    #     self.integral += self.err * (1/self.loop_freq)
+    #     self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
-        # Calculate distance to reference pose
-        self.distanceErrPrev = self.distanceErr
-        self.distanceErr = np.sqrt(self.err[0]**2 + self.err[1]**2) * np.sign(math.atan2(self.err[1], self.err[0]))
-        self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
-        self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq        
+    #     # Calculate distance to reference pose
+    #     self.distanceErrPrev = self.distanceErr
+    #     self.distanceErr = np.sqrt(self.err[0]**2 + self.err[1]**2) * np.sign(math.atan2(self.err[1], self.err[0]))
+    #     self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
+    #     self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq        
 
-        # Controller
-        u[0] = (Kp[0]*self.distanceErr \
-            + Ki[0]*self.distanceErrInt \
-            + Kd[0]*self.distanceErrDeriv)    # PID control thrusters    
-        u[1] = (Kp[1]*self.err[5] + Ki[1]*self.integral[5])   # PI control vectoring (horizontal)
-        u[2] = (Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
-        u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
-        u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
+    #     # Controller
+    #     u[0] = (Kp[0]*self.distanceErr \
+    #         + Ki[0]*self.distanceErrInt \
+    #         + Kd[0]*self.distanceErrDeriv)    # PID control thrusters    
+    #     u[1] = (Kp[1]*self.err[5] + Ki[1]*self.integral[5])   # PI control vectoring (horizontal)
+    #     u[2] = (Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
+    #     u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
+    #     u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
 
-        return u
+    #     return u
 
     def limitControlAction(self,u):
         # Enforce hardware limits on actuator control
@@ -482,22 +450,23 @@ class P_Controller(object):
         if uLimited[4] < 0:
             uLimited[4] = 0
 
-        # print("All in ENU:")
-        # print("[x, y, z, roll, pitch, yaw]")
-        # self.printNumpyArray(self.current_x,"Current States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        # self.printNumpyArray(self.ref,"Reference States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        # self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        # sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f\n" % (self.distanceErr, self.headingAngle))    
-        # print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
-        # print("Control Input raw:", np.around(u, decimals=3))
-        # print("Control Input lim:", np.around(uLimited, decimals=3))
-        # print("")
+        print("All in ENU:")
+        print("[x, y, z, roll, pitch, yaw]")
+        self.printNumpyArray(self.current_x,"Current States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        self.printNumpyArray(self.ref,"Reference States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f\n" % (self.distanceErr, self.headingAngle))    
+        print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
+        sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (u[0], u[1], u[2], u[3], u[4]))
+        sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (uLimited[0], uLimited[1], uLimited[2], uLimited[3], uLimited[4]))
+        print("")
 
 
 
         return uLimited
 
     def printNumpyArray(self, array, string):
+
         sys.stdout.write(string  % (array[0], array[1], array[2], array[3], array[4], array[5]))
         
 
