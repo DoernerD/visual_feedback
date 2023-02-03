@@ -19,8 +19,6 @@ from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Pose, Poin
 
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_matrix, quaternion_from_matrix
 import tf
-# import tf2_ros
-# import tf2_geometry_msgs.tf2_geometry_msgs
 
 
 class P_Controller(object):
@@ -49,7 +47,6 @@ class P_Controller(object):
         # Subscribers to state feedback, setpoints and enable flags
         rospy.Subscriber(state_feedback_topic, Odometry, self.feedbackCallback)
         rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
-        # rospy.Subscriber(ref_pose_topic, Pose, self.poseCallback)
 
         # Publisher to actuators
         self.rpm1Pub = rospy.Publisher(rpm1_topic, ThrusterRPM, queue_size=10)
@@ -58,16 +55,11 @@ class P_Controller(object):
         self.vbsPub = rospy.Publisher(vbs_topic, PercentStamped, queue_size=10)
         self.lcgPub = rospy.Publisher(lcg_topic, PercentStamped, queue_size=10)
  
-        self.posePub = rospy.Publisher(samPoseTopic, PoseStamped, queue_size=10)
-
         self.control_error_pub = rospy.Publisher(control_error_topic, Float64, queue_size=10)
-        # self.u_pub = rospy.Publisher(control_input_topic, Float64, queue_size=10)
+        
 
-        # TF tree listener
-        # self.tf_buffer = tf2_ros.Buffer()
-        # self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
+        # TF tree listener        
         self.listener = tf.TransformListener()
-
         self.base_frame = 'sam/base_link'
 
         rate = rospy.Rate(self.loop_freq) 
@@ -109,7 +101,6 @@ class P_Controller(object):
 
             uLimited = self.limitControlAction(u)
 
-            self.publishPose()
             self.publishControlAction(uLimited)
 
             rate.sleep()
@@ -118,11 +109,10 @@ class P_Controller(object):
     #region Call-backs
     def feedbackCallback(self, odom_fb):
         # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
-        self.current_x = self.getEulerFromQuaternion(odom_fb.pose,'xyzs')
+        self.current_x = self.getEulerFromQuaternion(odom_fb.pose)
 
     def poseCallback(self,estimFB):
         # Get way point in map frame
-        # self.ref = self.getEulerFromQuaternion(estimFB.pose,'xyzs')
         self.ref = np.zeros([6])
 
         # Transform waypoint map --> base frame
@@ -147,7 +137,7 @@ class P_Controller(object):
 
             
     
-    def getEulerFromQuaternion(self, pose, order):
+    def getEulerFromQuaternion(self, pose):
         # Pose is in ENU. The callback extracts the position and Euler angles.
         #
         # Pose in ENU 
@@ -160,13 +150,8 @@ class P_Controller(object):
         eta2ENU = pose.pose.orientation.y
         eta3ENU = pose.pose.orientation.z
         
-        # for some reason the odom pose uses a different order for the euler-quaternion transformation. The else statement should be the default.
-        if order is 'xyzs':
-            rpyENU = euler_from_quaternion([eta1ENU,eta2ENU,eta3ENU,eta0ENU])
-        else:
-            rpyENU = euler_from_quaternion([eta0ENU,eta1ENU,eta2ENU,eta3ENU],'sxyz')
-
-
+        rpyENU = euler_from_quaternion([eta1ENU,eta2ENU,eta3ENU,eta0ENU])
+        
         rollENU = rpyENU[0]
         pitchENU = rpyENU[1]
         yawENU = rpyENU[2]
@@ -251,25 +236,6 @@ class P_Controller(object):
     #endregion
 
     #region Publisher
-    def publishPose(self):
-        # Pose in NED
-        pose = PoseStamped()
-
-        pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = "sam_pose"
-
-        pose.pose.position.x = self.current_x[0]
-        pose.pose.position.y = self.current_x[1]
-        pose.pose.position.z = self.current_x[2]
-
-        quaternion = quaternion_from_euler(self.current_x[3],self.current_x[4],self.current_x[5])
-        pose.pose.orientation.x = quaternion[1]
-        pose.pose.orientation.y = quaternion[2]
-        pose.pose.orientation.z = quaternion[3]
-        pose.pose.orientation.w = quaternion[0]
-
-        self.posePub.publish(pose)
-
     def publishControlAction(self, u):
 
         thruster1 = ThrusterRPM()
@@ -293,7 +259,6 @@ class P_Controller(object):
         self.lcgPub.publish(lcg)
         
         # Publish control inputs and error for visualization
-        # self.u_pub.publish(u)   
         self.control_error_pub.publish(self.err[5])   
     #endregion
 
@@ -391,48 +356,12 @@ class P_Controller(object):
         else:
             u[0] = 0
         u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt)   # PI control vectoring (horizontal)
-        # u[2] = -(Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
-        u[2] = -(Kp[2]*self.err[2] + Ki[2]*self.err[2])   # PI control vectoring (vertical)
+        u[2] = -(Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
         u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
         u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
 
         return u
 
-
-
-    # def computePIDControlAction(self):
-    #     # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
-    #     # x = [x, y, z, roll, pitch, yaw]
-
-    #     # Gains for distance based error
-    #     Kp = np.array([10, 10, 10, 150, 1000])        # P control gain
-    #     Ki = np.array([1, 0.1, 0.1, 3, 10])                # I control gain
-    #     Kd = np.array([1., 1., 1., 1., 1.])
-
-    #     u = np.array([0., 0., 0., 0., 50.])
-
-    #     # Error calculation
-    #     self.errPrev = self.err.copy()
-    #     self.err = self.ref - self.current_x
-    #     self.integral += self.err * (1/self.loop_freq)
-    #     self.deriv = (self.err - self.errPrev) * (self.loop_freq)
-
-    #     # Calculate distance to reference pose
-    #     self.distanceErrPrev = self.distanceErr
-    #     self.distanceErr = np.sqrt(self.err[0]**2 + self.err[1]**2) * np.sign(math.atan2(self.err[1], self.err[0]))
-    #     self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
-    #     self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq        
-
-    #     # Controller
-    #     u[0] = (Kp[0]*self.distanceErr \
-    #         + Ki[0]*self.distanceErrInt \
-    #         + Kd[0]*self.distanceErrDeriv)    # PID control thrusters    
-    #     u[1] = (Kp[1]*self.err[5] + Ki[1]*self.integral[5])   # PI control vectoring (horizontal)
-    #     u[2] = (Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
-    #     u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
-    #     u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
-
-    #     return u
 
     def limitControlAction(self,u):
         # Enforce hardware limits on actuator control
@@ -461,13 +390,11 @@ class P_Controller(object):
         sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (uLimited[0], uLimited[1], uLimited[2], uLimited[3], uLimited[4]))
         print("")
 
-
-
         return uLimited
 
     def printNumpyArray(self, array, string):
 
-        sys.stdout.write(string  % (array[0], array[1], array[2], array[3], array[4], array[5]))
+        sys.stdout.write(string % (array[0], array[1], array[2], array[3], array[4], array[5]))
         
 
 if __name__ == "__main__":
