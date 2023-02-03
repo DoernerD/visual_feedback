@@ -35,9 +35,12 @@ if __name__ == "__main__":
     while not rospy.is_shutdown():
         try:
             # Get tfm ^S T_{S/DS}.
-            sam_tfm_ds = tf_buffer.lookup_transform(
-                'sam/base_link', 'docking_station/base_link', rospy.Time())
+            # sam_tfm_ds = tf_buffer.lookup_transform(
+            #     'docking_station/base_link', 'sam/base_link', rospy.Time())
 
+            sam_tfm_ds = tf_buffer.lookup_transform(
+                'map','docking_station/base_link', rospy.Time())
+                
             # Apparently pose_msg uses point and tfm_msg uses vector...
             pose.pose.pose.position.x = sam_tfm_ds.transform.translation.x
             pose.pose.pose.position.y = sam_tfm_ds.transform.translation.y
