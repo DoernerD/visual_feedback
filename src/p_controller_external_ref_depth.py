@@ -14,7 +14,7 @@ from std_msgs.msg import Float64
 from smarc_msgs.msg import ThrusterRPM
 from sam_msgs.msg import ThrusterAngles, PercentStamped
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, PointStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Pose, PointStamped
 
 
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_matrix, quaternion_from_matrix
@@ -48,7 +48,8 @@ class P_Controller(object):
         # Subscribers to state feedback, setpoints and enable flags
         rospy.Subscriber(state_feedback_topic, Odometry, self.feedbackCallback)
         # rospy.Subscriber(ref_pose_topic, PoseStamped, self.poseCallback)
-        rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
+        # rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
+        rospy.Subscriber(ref_pose_topic, Pose, self.poseCallback)
 
         # Publisher to actuators
         self.rpm1Pub = rospy.Publisher(rpm1_topic, ThrusterRPM, queue_size=10)
@@ -124,7 +125,7 @@ class P_Controller(object):
         # # sys.stdout.flush()
         # # sys.stdout.write("poseCB")
 
-        self.ref = self.getEulerFromQuaternion(estimFB.pose,'xyzs')
+        self.ref = self.getEulerFromQuaternion(estimFB,'xyzs')
         # self.ref = np.zeros([6])
 
         # # Transform goal map --> base frame
@@ -481,16 +482,16 @@ class P_Controller(object):
         if uLimited[4] < 0:
             uLimited[4] = 0
 
-        print("All in ENU:")
-        print("[x, y, z, roll, pitch, yaw]")
-        self.printNumpyArray(self.current_x,"Current States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        self.printNumpyArray(self.ref,"Reference States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f\n" % (self.distanceErr, self.headingAngle))    
-        print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
-        print("Control Input raw:", np.around(u, decimals=3))
-        print("Control Input lim:", np.around(uLimited, decimals=3))
-        print("")
+        # print("All in ENU:")
+        # print("[x, y, z, roll, pitch, yaw]")
+        # self.printNumpyArray(self.current_x,"Current States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        # self.printNumpyArray(self.ref,"Reference States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        # self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        # sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f\n" % (self.distanceErr, self.headingAngle))    
+        # print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
+        # print("Control Input raw:", np.around(u, decimals=3))
+        # print("Control Input lim:", np.around(uLimited, decimals=3))
+        # print("")
 
 
 

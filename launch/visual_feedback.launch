@@ -13,8 +13,44 @@
     <arg name="control_error_topic" default="/$(arg robot_name)/ctrl/control_error" />
     <!-- <arg name="control_input_topic" default="/$(arg robot_name)/ctrl/control_input" /> -->
 
-    <arg name="ref_pose_topic" default="/docking_station/gt/pose" />
     
+    <!-- Motion Planning Launch-->
+    <arg name="waypoint_topic_arg" default="/waypoint_topic"/>
+    <arg name="motion_plan_service_arg" default="/motion_plan_service"/>
+    <arg name="state_topic_arg" default="$(arg state_feedback_topic)"/>
+    <!-- <arg name="docking_topic_arg" default="/something4"/> -->
+
+    <arg name="base_frame_arg" default="sam/base_link"/>
+    <arg name="docking_frame_arg" default="docking_station/base_link"/>
+    <arg name="map_frame_arg" default="map"/>
+
+    <!-- Nodes -->
+    <node pkg="sam_motion_planning" type="planner.py" name="planner_node" output="screen">
+        <param name="waypoint_topic_name" value="$(arg waypoint_topic_arg)"/>
+        <param name="motion_plan_service_topic_name" value="$(arg motion_plan_service_arg)"/>
+        <param name="state_topic_name" value="$(arg state_topic_arg)"/>
+        <!-- <param name="docking_topic_name" value="$(arg docking_topic_arg)"/> -->
+
+        <param name="base_frame_name" value="$(arg base_frame_arg)"/>
+        <param name="docking_frame_name" value="$(arg docking_frame_arg)"/>
+        <param name="map_frame_name" value="$(arg map_frame_arg)"/>
+    </node>
+
+    <node pkg="sam_motion_planning" type="motion_planning_service.py" name="planner_service" output="screen">
+        <param name="waypoint_topic_name" value="$(arg waypoint_topic_arg)"/>
+        <param name="motion_plan_service_topic_name" value="$(arg motion_plan_service_arg)"/>
+        <param name="state_topic_name" value="$(arg state_topic_arg)"/>
+
+        <param name="base_frame_name" value="$(arg base_frame_arg)"/>
+        <param name="docking_frame_name" value="$(arg docking_frame_arg)"/>
+        <param name="map_frame_name" value="$(arg map_frame_arg)"/>
+    </node>
+
+
+    <!-- Control Launch-->
+    <arg name="ref_pose_topic" default="/waypoint_topic" />
+
+
     <!-- Nodes -->
     <!-- Ground truth for the estimate-->
     <node pkg="tf" type="static_transform_publisher" name="sam_static_tfm_ds"
