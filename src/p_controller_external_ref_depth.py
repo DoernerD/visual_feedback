@@ -272,16 +272,6 @@ class P_Controller(object):
         self.ref[2] = -1.5
         self.ref[4] = 0.
 
-        ## THIS DOESN'T WORK! 
-        # There needs to be a different way to implement breaking when approaching the docking
-        # station. The idea is to reverse the RPM to get some breaking force.
-        # if self.velocities[0] != 0:
-        #     if np.abs(self.distanceErr) < 0.5:
-        #         u = np.array([0., 0., 0., 0., 50.])
-
-        #         u[0] = -np.sign(self.distanceErr)*500
-        #         return u
-
         # Not sure if the condition works correctly...
         while ((np.abs(self.current_x[2] - self.ref[2]) >= epsDepth) and (np.abs(self.current_x[4] - self.ref[4]) >= epsPitch)):
             u = self.computeDepthControlAction()
@@ -338,7 +328,7 @@ class P_Controller(object):
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
         self.headingAngle = math.atan2(self.ref[1], self.ref[0])
-        self.headingAngleInt += 0.#self.headingAngleInt * (1/self.loop_freq)
+        self.headingAngleInt += self.headingAngleInt * (1/self.loop_freq)
 
         # Calculate distance to reference pose
         self.distanceErrPrev = self.distanceErr
