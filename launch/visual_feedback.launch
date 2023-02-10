@@ -54,8 +54,8 @@
     </node>
 
     <!-- Control Launch-->
-    <!-- <arg name="ref_pose_topic" default="/docking_station/gt/pose" /> -->
-    <arg name="ref_pose_topic" default="$(arg waypoint_topic_arg)" />
+    <arg name="ref_pose_topic" default="/docking_station/gt/pose" />
+    <!-- <arg name="ref_pose_topic" default="$(arg waypoint_topic_arg)" /> -->
 
 
     <!-- Nodes -->

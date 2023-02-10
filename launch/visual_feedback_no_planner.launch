@@ -1,0 +1,38 @@
+<launch>
+
+    <!-- Configurable arguments -->
+    <arg name="robot_name" default="sam"/>
+
+    <arg name="loop_freq" default="20."/>
+
+    <!-- topics, note the root! -->
+    <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" />
+
+    <arg name="vbs_topic" default="/$(arg robot_name)/core/vbs_cmd" />
+
+    <arg name="control_error_topic" default="/$(arg robot_name)/ctrl/control_error" />
+    <!-- <arg name="control_input_topic" default="/$(arg robot_name)/ctrl/control_input" /> -->
+
+    <!-- Control Launch-->
+    <arg name="ref_pose_topic" default="/docking_station/gt/pose" />
+
+    <!-- Nodes -->
+    <!-- Ground truth for the estimate-->
+    <node pkg="tf" type="static_transform_publisher" name="sam_static_tfm_ds"
+        args="0.0 15.0 -1.5 0.0 0.0 0.0 map docking_station/base_link 20"/>
+
+    <!-- Controller -->
+    <node name="p_controller_external_ref_depth" pkg="visual_feedback" type="p_controller_external_ref_depth.py" 
+        output="screen" ns="$(arg robot_name)/ctrl">
+
+        <param name="loop_freq" value="$(arg loop_freq)"/>
+
+        <param name="ref_pose_topic" value="$(arg ref_pose_topic)" />
+
+        <param name="state_feedback_topic" value="$(arg state_feedback_topic)" />	                
+        <param name="vbs_topic" value="$(arg vbs_topic)" />
+        <param name="control_error_topic" value="$(arg control_error_topic)" />
+        <!-- <param name="control_input_topic" value="$(arg control_input_topic)" /> -->
+    </node>
+
+</launch>

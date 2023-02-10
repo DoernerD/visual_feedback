@@ -60,7 +60,7 @@ class P_Controller(object):
 
         # TF tree listener        
         self.listener = tf.TransformListener()
-        self.base_frame = 'sam/base_link'
+        self.base_frame = 'gt/sam/base_link'
 
         rate = rospy.Rate(self.loop_freq) 
 
@@ -369,16 +369,16 @@ class P_Controller(object):
         if uLimited[4] < 0:
             uLimited[4] = 0
 
-        # print("All in ENU:")
-        # print("[x, y, z, roll, pitch, yaw]")
-        # self.printNumpyArray(self.current_x,"Current States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        # self.printNumpyArray(self.ref,"Reference States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        # self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        # sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f\n" % (self.distanceErr, self.headingAngle))    
-        # print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
-        # sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (u[0], u[1], u[2], u[3], u[4]))
-        # sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (uLimited[0], uLimited[1], uLimited[2], uLimited[3], uLimited[4]))
-        # print("")
+        print("All in ENU:")
+        print("[x, y, z, roll, pitch, yaw]")
+        self.printNumpyArray(self.current_x,"Current States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        self.printNumpyArray(self.ref,"Reference States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f\n" % (self.distanceErr, self.headingAngle))    
+        print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
+        sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (u[0], u[1], u[2], u[3], u[4]))
+        sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (uLimited[0], uLimited[1], uLimited[2], uLimited[3], uLimited[4]))
+        print("")
 
         return uLimited
 
