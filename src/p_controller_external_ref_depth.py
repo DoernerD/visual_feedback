@@ -46,7 +46,8 @@ class P_Controller(object):
 
         # Subscribers to state feedback, setpoints and enable flags
         rospy.Subscriber(state_feedback_topic, Odometry, self.feedbackCallback)
-        rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
+        # rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
+        rospy.Subscriber(ref_pose_topic, Pose, self.poseCallback)
 
         # Publisher to actuators
         self.rpm1Pub = rospy.Publisher(rpm1_topic, ThrusterRPM, queue_size=10)
@@ -119,9 +120,13 @@ class P_Controller(object):
         goal_point = PointStamped()
         goal_point.header.frame_id = 'map'
         goal_point.header.stamp = rospy.Time(0)
-        goal_point.point.x = estimFB.pose.pose.position.x
-        goal_point.point.y = estimFB.pose.pose.position.y
-        goal_point.point.z = estimFB.pose.pose.position.z
+        # goal_point.point.x = estimFB.pose.pose.position.x
+        # goal_point.point.y = estimFB.pose.pose.position.y
+        # goal_point.point.z = estimFB.pose.pose.position.z
+
+        goal_point.point.x = estimFB.position.x
+        goal_point.point.y = estimFB.position.y
+        goal_point.point.z = estimFB.position.z
 
         try:
             goal_point_local = self.listener.transformPoint(
@@ -375,9 +380,9 @@ class P_Controller(object):
         self.printNumpyArray(self.ref,"Reference States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
         self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
         sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f\n" % (self.distanceErr, self.headingAngle))    
-        print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
-        sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (u[0], u[1], u[2], u[3], u[4]))
-        sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (uLimited[0], uLimited[1], uLimited[2], uLimited[3], uLimited[4]))
+        # print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
+        # sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (u[0], u[1], u[2], u[3], u[4]))
+        # sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (uLimited[0], uLimited[1], uLimited[2], uLimited[3], uLimited[4]))
         print("")
 
         return uLimited
