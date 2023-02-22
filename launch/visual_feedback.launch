@@ -41,7 +41,7 @@
     <!-- Nodes -->
     <!-- Ground truth for the estimate-->
     <node pkg="tf" type="static_transform_publisher" name="sam_static_tfm_ds"
-        args="0.0 15.0 -1.5 0.0 0.0 0.0 map docking_station/base_link 20"/>
+        args="0.0 20.0 -1.5 0.0 0.0 0.0 map docking_station/base_link 20"/>
 
     <node name="p_controller_external_ref_depth" pkg="visual_feedback" type="p_controller_external_ref_depth.py" 
         output="screen" ns="$(arg robot_name)/ctrl">

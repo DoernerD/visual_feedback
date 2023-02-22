@@ -46,8 +46,8 @@ class P_Controller(object):
 
         # Subscribers to state feedback, setpoints and enable flags
         rospy.Subscriber(state_feedback_topic, Odometry, self.feedbackCallback)
-        # rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
-        rospy.Subscriber(ref_pose_topic, Pose, self.poseCallback)
+        rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
+        # rospy.Subscriber(ref_pose_topic, Pose, self.poseCallback)
 
         # Publisher to actuators
         self.rpm1Pub = rospy.Publisher(rpm1_topic, ThrusterRPM, queue_size=10)
@@ -120,13 +120,13 @@ class P_Controller(object):
         goal_point = PointStamped()
         goal_point.header.frame_id = 'map'
         goal_point.header.stamp = rospy.Time(0)
-        # goal_point.point.x = estimFB.pose.pose.position.x
-        # goal_point.point.y = estimFB.pose.pose.position.y
-        # goal_point.point.z = estimFB.pose.pose.position.z
+        goal_point.point.x = estimFB.pose.pose.position.x
+        goal_point.point.y = estimFB.pose.pose.position.y
+        goal_point.point.z = estimFB.pose.pose.position.z
 
-        goal_point.point.x = estimFB.position.x
-        goal_point.point.y = estimFB.position.y
-        goal_point.point.z = estimFB.position.z
+        # goal_point.point.x = estimFB.position.x
+        # goal_point.point.y = estimFB.position.y
+        # goal_point.point.z = estimFB.position.z
 
         try:
             goal_point_local = self.listener.transformPoint(
@@ -333,11 +333,13 @@ class P_Controller(object):
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
         self.headingAngle = math.atan2(self.ref[1], self.ref[0])
-        self.headingAngleInt += self.headingAngleInt * (1/self.loop_freq)
+        self.headingAngleInt += self.headingAngle * (1/self.loop_freq)
+
+        self.headingAngleShift = self.headingAngle + np.pi/2
 
         # Calculate distance to reference pose
         self.distanceErrPrev = self.distanceErr
-        self.distanceErr = np.sqrt(self.ref[0]**2 + self.ref[1]**2)# * np.sign(self.headingAngle)
+        self.distanceErr = np.sqrt(self.ref[0]**2 + self.ref[1]**2) * np.sign(self.headingAngleShift)
         self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
         self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq   
 
@@ -346,11 +348,15 @@ class P_Controller(object):
         # Going forwards and backwards based on th distance to the target
         if self.distanceErr > 1:
             u[0] = 500
+            u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt)   # PI control vectoring (horizontal)
+
         elif self.distanceErr < -1:
             u[0] = -500
+            self.headingAngleScaled = np.sign(self.headingAngle) * (np.pi - np.abs(self.headingAngle))
+            u[1] = -(Kp[1]*self.headingAngleScaled - Ki[1]*self.headingAngleInt)   # PI control vectoring (horizontal)
+
         else:
             u[0] = 0
-        u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt)   # PI control vectoring (horizontal)
         u[2] = -(Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
         u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
         u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
@@ -376,13 +382,13 @@ class P_Controller(object):
 
         print("All in ENU:")
         print("[x, y, z, roll, pitch, yaw]")
-        self.printNumpyArray(self.current_x,"Current States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        self.printNumpyArray(self.ref,"Reference States: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f\n" % (self.distanceErr, self.headingAngle))    
-        # print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
+        self.printNumpyArray(self.current_x,"Current States (map): %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        self.printNumpyArray(self.ref,"Reference States (SAM): %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        # self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f, Depth Error: %.4f\n" % (self.distanceErr, self.headingAngle, self.err[2]))    
+        print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
         # sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (u[0], u[1], u[2], u[3], u[4]))
-        # sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (uLimited[0], uLimited[1], uLimited[2], uLimited[3], uLimited[4]))
+        sys.stdout.write("Control Input: %.4f %.4f %.4f %.4f %.4f\n"  % (uLimited[0], uLimited[1], uLimited[2], uLimited[3], uLimited[4]))
         print("")
 
         return uLimited
