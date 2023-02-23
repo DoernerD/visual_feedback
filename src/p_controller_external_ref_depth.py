@@ -335,11 +335,9 @@ class P_Controller(object):
         self.headingAngle = math.atan2(self.ref[1], self.ref[0])
         self.headingAngleInt += self.headingAngle * (1/self.loop_freq)
 
-        self.headingAngleShift = self.headingAngle + np.pi/2
-
         # Calculate distance to reference pose
         self.distanceErrPrev = self.distanceErr
-        self.distanceErr = np.sqrt(self.ref[0]**2 + self.ref[1]**2) * np.sign(self.headingAngleShift)
+        self.distanceErr = np.sqrt(self.ref[0]**2 + self.ref[1]**2) * np.sign(self.ref[0])
         self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
         self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq   
 

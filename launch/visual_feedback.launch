@@ -21,10 +21,13 @@
     <arg name="base_frame_arg" default="gt/sam/base_link"/>
     <arg name="docking_frame_arg" default="docking_station/base_link"/>
     <arg name="map_frame_arg" default="map"/>
+    <arg name="waypoint_marker_arg" default="/planner_node/waypoint_maker_topic"/>
+    
 
     <!-- Nodes -->
     <node pkg="sam_motion_planning" type="planner_class.py" name="planner_node" output="screen">
         <param name="waypoint_topic_name" value="$(arg waypoint_topic_arg)"/>
+        <param name="waypoint_maker_topic" value="$(arg waypoint_marker_arg)"/>
         <param name="motion_plan_service_topic_name" value="$(arg motion_plan_service_arg)"/>
         <param name="state_topic_name" value="$(arg state_topic_arg)"/>
 
