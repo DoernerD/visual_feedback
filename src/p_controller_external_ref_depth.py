@@ -43,10 +43,12 @@ class P_Controller(object):
 
         # ref_pose_topic = rospy.get_param("~ref_pose_topic", "/dockingStation/pose")
         ref_pose_topic = rospy.get_param("~ref_pose_topic")
+        state_estimate_topic = rospy.get_param("~state_estimation_topic")
 
         # Subscribers to state feedback, setpoints and enable flags
         rospy.Subscriber(state_feedback_topic, Odometry, self.feedbackCallback)
         rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
+        rospy.Subscriber(state_estimate_topic, PoseWithCovarianceStamped, self.estimCallback)
         # rospy.Subscriber(ref_pose_topic, Pose, self.poseCallback)
 
         # Publisher to actuators
@@ -61,7 +63,7 @@ class P_Controller(object):
 
         # TF tree listener        
         self.listener = tf.TransformListener()
-        self.base_frame = 'gt/sam/base_link'
+        self.base_frame = 'sam/base_link/estimated'
 
         rate = rospy.Rate(self.loop_freq) 
 
@@ -111,6 +113,12 @@ class P_Controller(object):
     def feedbackCallback(self, odom_fb):
         # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
         self.current_x = self.getEulerFromQuaternion(odom_fb.pose)
+
+    def estimCallback(self, estim):
+        # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
+        self.stateEstim = self.getEulerFromQuaternion(estim.pose)
+
+    
 
     def poseCallback(self,estimFB):
         # Get way point in map frame

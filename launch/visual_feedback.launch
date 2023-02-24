@@ -7,6 +7,7 @@
 
     <!-- topics, note the root! -->
     <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" />
+    <arg name="state_estimation_topic" default="/$(arg robot_name)/EstimatedPose" />
 
     <arg name="vbs_topic" default="/$(arg robot_name)/core/vbs_cmd" />
 
@@ -55,6 +56,7 @@
         <param name="ref_pose_topic" value="$(arg ref_pose_topic)" />
 
         <param name="state_feedback_topic" value="$(arg state_feedback_topic)" />	                
+        <param name="state_estimation_topic" value="$(arg state_estimation_topic)" />	                
         <param name="vbs_topic" value="$(arg vbs_topic)" />
         <param name="control_error_topic" value="$(arg control_error_topic)" />
         <!-- <param name="control_input_topic" value="$(arg control_input_topic)" /> -->
