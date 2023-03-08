@@ -19,8 +19,8 @@
     <arg name="waypoint_topic_arg" default="/waypoint_topic"/>
     <arg name="motion_plan_service_arg" default="/motion_plan_service"/>
     <arg name="state_topic_arg" default="$(arg state_feedback_topic)"/>
-    <arg name="base_frame_arg" default="gt/sam/base_link"/>
-    <arg name="docking_frame_arg" default="docking_station/base_link"/>
+    <arg name="base_frame_arg" default="sam/base_link/estimated"/>
+    <arg name="docking_frame_arg" default="docking_station_ned/estimated"/>
     <arg name="map_frame_arg" default="map"/>
     <arg name="waypoint_marker_arg" default="/planner_node/waypoint_maker_topic"/>
     
