@@ -353,11 +353,11 @@ class P_Controller(object):
 
         # Going forwards and backwards based on th distance to the target
         if self.distanceErr > 1:
-            u[0] = 500
+            u[0] = 150
             u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt)   # PI control vectoring (horizontal)
 
         elif self.distanceErr < -1:
-            u[0] = -500
+            u[0] = -150
             self.headingAngleScaled = np.sign(self.headingAngle) * (np.pi - np.abs(self.headingAngle))
             u[1] = -(Kp[1]*self.headingAngleScaled - Ki[1]*self.headingAngleInt)   # PI control vectoring (horizontal)
 
