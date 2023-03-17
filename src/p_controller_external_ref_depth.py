@@ -194,8 +194,8 @@ class P_Controller(object):
         self.rpm1Pub.publish(thruster1)
         self.rpm2Pub.publish(thruster2)
         self.vecPub.publish(vec)
-        self.vbsPub.publish(vbs)
-        self.lcgPub.publish(lcg)
+        #self.vbsPub.publish(vbs)
+        #self.lcgPub.publish(lcg)
         
         # Publish control inputs and error for visualization
         # self.u_pub.publish(u)   
@@ -205,7 +205,7 @@ class P_Controller(object):
     # Controller
     def computeControlAction(self):
         # Sliding Mode Control for Depth First control
-        epsDepth = 0.2 # offset for depth control
+        epsDepth = 0.4 # offset for depth control
         epsPitch = 0.05 # offset for pitch control
 
         ## THIS DOESN'T WORK! 
