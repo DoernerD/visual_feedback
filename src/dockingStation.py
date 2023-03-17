@@ -42,13 +42,13 @@ class DockingStation(object):
         pose.header.frame_id = "docking_station"
 
         pose.pose.position.x = 0.0
-        pose.pose.position.y = 10.0  #20.0
+        pose.pose.position.y = 15.0  # Docking station visualization at 20.0
         pose.pose.position.z = -1.5
 
 
         roll = 0 
         pitch = 0
-        yaw = 0 
+        yaw = np.pi/2
 
         quaternion = quaternion_from_euler(roll, pitch, yaw, 'sxyz')
 

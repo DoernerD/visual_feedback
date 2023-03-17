@@ -1,0 +1,67 @@
+<launch>
+
+    <!-- Configurable arguments -->
+    <arg name="robot_name" default="sam"/>
+
+    <arg name="loop_freq" default="20."/>
+
+    <!-- topics, note the root! -->
+    <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" />
+    <arg name="state_estimation_topic" default="/$(arg robot_name)/EstimatedPose" />
+
+    <arg name="vbs_topic" default="/$(arg robot_name)/core/vbs_cmd" />
+
+    <arg name="control_error_topic" default="/$(arg robot_name)/ctrl/control_error" />
+    <!-- <arg name="control_input_topic" default="/$(arg robot_name)/ctrl/control_input" /> -->
+
+    
+    <!-- Motion Planning Launch-->
+    <arg name="waypoint_topic_arg" default="/waypoint_topic"/>
+    <arg name="motion_plan_service_arg" default="/motion_plan_service"/>
+    <arg name="state_topic_arg" default="$(arg state_feedback_topic)"/>
+    <arg name="base_frame_arg" default="sam/base_link/estimated"/>
+    <arg name="docking_frame_arg" default="docking_station_planning"/>
+    <arg name="map_frame_arg" default="map"/>
+    <arg name="waypoint_marker_arg" default="/planner_node/waypoint_maker_topic"/>
+    <arg name="found_station_arg" default="/found_station"/>
+    
+
+    <!-- Nodes -->
+    <node pkg="sam_motion_planning" type="planner_class.py" name="planner_node" output="screen">
+        <param name="waypoint_topic_name" value="$(arg waypoint_topic_arg)"/>
+        <param name="waypoint_maker_topic" value="$(arg waypoint_marker_arg)"/>
+        <param name="motion_plan_service_topic_name" value="$(arg motion_plan_service_arg)"/>
+        <param name="state_topic_name" value="$(arg state_topic_arg)"/>
+
+        <param name="base_frame_name" value="$(arg base_frame_arg)"/>
+        <param name="docking_frame_name" value="$(arg docking_frame_arg)"/>
+        <param name="map_frame_name" value="$(arg map_frame_arg)"/>
+        <param name="found_station_name" value="$(arg found_station_arg)"/>
+    </node>
+
+    <!-- Control Launch-->
+    <!-- <arg name="ref_pose_topic" default="/docking_station/gt/pose" /> -->
+    <arg name="ref_pose_topic" default="$(arg waypoint_topic_arg)" />
+
+
+    <!-- Nodes -->
+    <!-- Ground truth for the estimate-->
+    <node pkg="tf" type="static_transform_publisher" name="sam_static_tfm_ds"
+        args="0.0 20.0 -1.5 0.0 0.0 0.0 map docking_station/base_link 20"/>
+
+    <node name="p_controller_external_ref_depth" pkg="visual_feedback" type="p_controller_external_ref_depth.py" 
+        output="screen" ns="$(arg robot_name)/ctrl">
+
+        <param name="loop_freq" value="$(arg loop_freq)"/>
+
+        <!-- <param name="ref_pose_topic" value="/docking_station/feature_model/estimated_pose" /> -->
+        <param name="ref_pose_topic" value="$(arg ref_pose_topic)" />
+
+        <param name="state_feedback_topic" value="$(arg state_feedback_topic)" />	                
+        <param name="state_estimation_topic" value="$(arg state_estimation_topic)" />	                
+        <param name="vbs_topic" value="$(arg vbs_topic)" />
+        <param name="control_error_topic" value="$(arg control_error_topic)" />
+        <!-- <param name="control_input_topic" value="$(arg control_input_topic)" /> -->
+    </node>
+
+</launch>
