@@ -35,11 +35,11 @@ class P_Controller(object):
         rpm1_topic = rospy.get_param("~rpm_topic_1", "/sam/core/thruster1_cmd")
         rpm2_topic = rospy.get_param("~rpm_topic_1", "/sam/core/thruster2_cmd")
         thrust_vector_cmd_topic = rospy.get_param("~thrust_vector_cmd_topic", "/sam/core/thrust_vector_cmd")
-        samPoseTopic = rospy.get_param("~samPoseTopic", "/sam/pose")
+        # samPoseTopic = rospy.get_param("~samPoseTopic", "/sam/pose")
 
 
         control_error_topic = rospy.get_param("~control_error_topic", "/sam/ctrl/control_error")
-        control_input_topic = rospy.get_param("~control_input_topic", "/sam/ctrl/control_input")
+        # control_input_topic = rospy.get_param("~control_input_topic", "/sam/ctrl/control_input")
 
         # ref_pose_topic = rospy.get_param("~ref_pose_topic", "/dockingStation/pose")
         ref_pose_topic = rospy.get_param("~ref_pose_topic")
@@ -89,7 +89,6 @@ class P_Controller(object):
         self.headingAngle = 0.
         self.headingAngleInt = 0.
 
-
         # Neutral actuator inputs
         self.vbsNeutral = 50
         self.lcgNeutral = 50
@@ -117,8 +116,6 @@ class P_Controller(object):
     def estimCallback(self, estim):
         # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
         self.stateEstim = self.getEulerFromQuaternion(estim.pose)
-
-    
 
     def poseCallback(self,estimFB):
         # Get way point in map frame
@@ -290,14 +287,11 @@ class P_Controller(object):
             u = self.computeDepthControlAction()
             return u
  
-        # u = self.computePIDControlAction()
         u = self.computeConstVelDepthControlAction()
 
         return u
 
     def computeDepthControlAction(self):
-        # print("Depth Control")
-
         # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
         # x = [x, y, z, roll, pitch, yaw]  
         u = np.array([0., 0., 0., 0., 50.])
@@ -320,8 +314,6 @@ class P_Controller(object):
         return u
 
     def computeConstVelDepthControlAction(self):
-        # print("Vel Control")
-
         # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
         # x = [x, y, z, roll, pitch, yaw]  
         u = np.array([0., 0., 0., 0., 50.])
@@ -349,8 +341,6 @@ class P_Controller(object):
         self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
         self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq   
 
-        
-
         # Going forwards and backwards based on th distance to the target
         if self.distanceErr > 1:
             u[0] = 200
@@ -369,7 +359,6 @@ class P_Controller(object):
 
         return u
 
-
     def limitControlAction(self,u):
         # Enforce hardware limits on actuator control
         uLimited = u.copy()     # without .copy(), python only makes a shallow copy of the array.
@@ -386,16 +375,16 @@ class P_Controller(object):
         if uLimited[4] < 0:
             uLimited[4] = 0
 
-        # print("All in ENU:")
-        # print("[x, y, z, roll, pitch, yaw]")
-        # self.printNumpyArray(self.current_x,"Current States (map): %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        # self.printNumpyArray(self.ref,"Reference States (SAM): %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        # # self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        # sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f, Depth Error: %.4f\n" % (self.distanceErr, self.headingAngle, self.err[2]))    
-        # print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
-        # # sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (u[0], u[1], u[2], u[3], u[4]))
-        # sys.stdout.write("Control Input: %.4f %.4f %.4f %.4f %.4f\n"  % (uLimited[0], uLimited[1], uLimited[2], uLimited[3], uLimited[4]))
-        # print("")
+        print("All in ENU:")
+        print("[x, y, z, roll, pitch, yaw]")
+        self.printNumpyArray(self.current_x,"Current States (map): %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        self.printNumpyArray(self.ref,"Reference States (SAM): %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        # self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f, Depth Error: %.4f\n" % (self.distanceErr, self.headingAngle, self.err[2]))    
+        print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
+        # sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (u[0], u[1], u[2], u[3], u[4]))
+        sys.stdout.write("Control Input: %.4f %.4f %.4f %.4f %.4f\n"  % (uLimited[0], uLimited[1], uLimited[2], uLimited[3], uLimited[4]))
+        print("")
 
         return uLimited
 

@@ -7,19 +7,23 @@
 
     <!-- topics, note the root! -->
     <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" />
+    <arg name="state_estimation_topic" default="/sam/gt/pose" />
+
 
     <arg name="vbs_topic" default="/$(arg robot_name)/core/vbs_cmd" />
 
     <arg name="control_error_topic" default="/$(arg robot_name)/ctrl/control_error" />
-    <!-- <arg name="control_input_topic" default="/$(arg robot_name)/ctrl/control_input" /> -->
 
     <!-- Control Launch-->
     <arg name="ref_pose_topic" default="/docking_station/gt/pose" />
+    <!-- <arg name="ref_pose_topic" default="/dockingStation/pose" /> -->
 
     <!-- Nodes -->
     <!-- Ground truth for the estimate-->
     <node pkg="tf" type="static_transform_publisher" name="sam_static_tfm_ds"
-        args="2.0 10.0 -1.5 0.0 0.0 0.0 map docking_station/base_link 20"/>
+        args="0.0 10.0 -1.5 0.0 0.0 0.0 map docking_station/base_link 20"/>
+
+    <node name="gt_helper" pkg="visual_feedback" type="tf_to_pose.py" output="screen"/>
 
     <!-- Controller -->
     <node name="p_controller_external_ref_depth" pkg="visual_feedback" type="p_controller_external_ref_depth.py" 
@@ -29,7 +33,9 @@
 
         <param name="ref_pose_topic" value="$(arg ref_pose_topic)" />
 
-        <param name="state_feedback_topic" value="$(arg state_feedback_topic)" />	                
+        <param name="state_feedback_topic" value="$(arg state_feedback_topic)" />	   
+        <param name="state_estimation_topic" value="$(arg state_estimation_topic)" />	                
+             
         <param name="vbs_topic" value="$(arg vbs_topic)" />
         <param name="control_error_topic" value="$(arg control_error_topic)" />
         <!-- <param name="control_input_topic" value="$(arg control_input_topic)" /> -->
