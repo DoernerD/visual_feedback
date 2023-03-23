@@ -7,6 +7,8 @@
 
     <!-- topics, note the root! -->
     <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" />
+    <arg name="depth_topic" default="/$(arg robot_name)/dr/depth" />
+
     <arg name="state_estimation_topic" default="/$(arg robot_name)/EstimatedPose" />
 
     <arg name="vbs_topic" default="/$(arg robot_name)/core/vbs_cmd" />
@@ -17,7 +19,7 @@
     <!-- Motion Planning Launch-->
     <arg name="waypoint_topic_arg" default="/waypoint_topic"/>
     <arg name="motion_plan_service_arg" default="/motion_plan_service"/>
-    <arg name="state_topic_arg" default="$(arg state_feedback_topic)"/>
+    <arg name="state_topic_arg" default="sam/EstimatedPose"/>
     <arg name="base_frame_arg" default="sam/base_link/estimated"/>
     <arg name="docking_frame_arg" default="docking_station_planning"/>
     <arg name="map_frame_arg" default="map"/>
@@ -55,6 +57,7 @@
         <param name="ref_pose_topic" value="$(arg ref_pose_topic)" />
 
         <param name="state_feedback_topic" value="$(arg state_feedback_topic)" />	                
+        <param name="depth_topic" value="$(arg depth_topic)" />	                
         <param name="state_estimation_topic" value="$(arg state_estimation_topic)" />	                
         <param name="vbs_topic" value="$(arg vbs_topic)" />
         <param name="control_error_topic" value="$(arg control_error_topic)" />

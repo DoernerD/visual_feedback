@@ -23,6 +23,7 @@ if __name__ == "__main__":
                                PoseWithCovarianceStamped, queue_size=10)
     sam_pub = rospy.Publisher("/sam/gt/pose",
                                PoseWithCovarianceStamped, queue_size=10)
+    # self.publishers["found_station"] = rospy.Publisher("found_station", Bool, queue_size=1)
 
     # We're gonna use tf2 since it's more stable than tf.
     tf_buffer = tf2_ros.Buffer()
@@ -65,7 +66,7 @@ if __name__ == "__main__":
             #     'docking_station/base_link', 'sam/base_link', rospy.Time())
 
             sam_tfm_map = tf_buffer.lookup_transform(
-                'map','gt/sam/base_link', rospy.Time())
+                'map','sam/odom', rospy.Time())
                 
             # Apparently pose_msg uses point and tfm_msg uses vector...
             samPose.pose.pose.position.x = sam_tfm_map.transform.translation.x

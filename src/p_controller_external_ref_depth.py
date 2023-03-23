@@ -28,45 +28,6 @@ class P_Controller(object):
 
         self.loop_freq = rospy.get_param("~loop_freq", 11)
 
-        # Topics for feedback and actuators
-        state_feedback_topic = rospy.get_param("~state_feedback_topic", "/sam/dr/odom")
-        vbs_topic = rospy.get_param("~vbs_topic", "/sam/core/vbs_cmd")
-        lcg_topic = rospy.get_param("~lcg_topic", "/sam/core/lcg_cmd")
-        rpm1_topic = rospy.get_param("~rpm_topic_1", "/sam/core/thruster1_cmd")
-        rpm2_topic = rospy.get_param("~rpm_topic_1", "/sam/core/thruster2_cmd")
-        thrust_vector_cmd_topic = rospy.get_param("~thrust_vector_cmd_topic", "/sam/core/thrust_vector_cmd")
-        # samPoseTopic = rospy.get_param("~samPoseTopic", "/sam/pose")
-
-
-        control_error_topic = rospy.get_param("~control_error_topic", "/sam/ctrl/control_error")
-        # control_input_topic = rospy.get_param("~control_input_topic", "/sam/ctrl/control_input")
-
-        # ref_pose_topic = rospy.get_param("~ref_pose_topic", "/dockingStation/pose")
-        ref_pose_topic = rospy.get_param("~ref_pose_topic")
-        state_estimate_topic = rospy.get_param("~state_estimation_topic")
-
-        # Subscribers to state feedback, setpoints and enable flags
-        rospy.Subscriber(state_feedback_topic, Odometry, self.feedbackCallback)
-        rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
-        rospy.Subscriber(state_estimate_topic, PoseWithCovarianceStamped, self.estimCallback)
-        # rospy.Subscriber(ref_pose_topic, Pose, self.poseCallback)
-
-        # Publisher to actuators
-        self.rpm1Pub = rospy.Publisher(rpm1_topic, ThrusterRPM, queue_size=10)
-        self.rpm2Pub = rospy.Publisher(rpm2_topic, ThrusterRPM, queue_size=10)
-        self.vecPub = rospy.Publisher(thrust_vector_cmd_topic, ThrusterAngles, queue_size=10)
-        self.vbsPub = rospy.Publisher(vbs_topic, PercentStamped, queue_size=10)
-        self.lcgPub = rospy.Publisher(lcg_topic, PercentStamped, queue_size=10)
- 
-        self.control_error_pub = rospy.Publisher(control_error_topic, Float64, queue_size=10)
-        
-
-        # TF tree listener        
-        self.listener = tf.TransformListener()
-        self.base_frame = 'sam/base_link/estimated'
-
-        rate = rospy.Rate(self.loop_freq) 
-
         # Init
         self.current_x = np.array([0., 0., 0.1, 1., 0., 0.])
         self.current_y = np.array([0., 0., 0.1, 1., 0., 0.])
@@ -96,6 +57,50 @@ class P_Controller(object):
         self.vecHorizontalNeutral = 0
         self.vecVerticalNeutral = 0
 
+        # Topics for feedback and actuators
+        # state_feedback_topic = rospy.get_param("~state_feedback_topic", "/sam/dr/odom")
+        depth_topic = rospy.get_param("~depth_topic", "/sam/dr/depth")
+        pitch_topic = rospy.get_param("~pitch_topic", "/sam/dr/pitch")
+
+        vbs_topic = rospy.get_param("~vbs_topic", "/sam/core/vbs_cmd")
+        lcg_topic = rospy.get_param("~lcg_topic", "/sam/core/lcg_cmd")
+        rpm1_topic = rospy.get_param("~rpm_topic_1", "/sam/core/thruster1_cmd")
+        rpm2_topic = rospy.get_param("~rpm_topic_1", "/sam/core/thruster2_cmd")
+        thrust_vector_cmd_topic = rospy.get_param("~thrust_vector_cmd_topic", "/sam/core/thrust_vector_cmd")
+        # samPoseTopic = rospy.get_param("~samPoseTopic", "/sam/pose")
+
+
+        control_error_topic = rospy.get_param("~control_error_topic", "/sam/ctrl/control_error")
+        # control_input_topic = rospy.get_param("~control_input_topic", "/sam/ctrl/control_input")
+
+        # ref_pose_topic = rospy.get_param("~ref_pose_topic", "/dockingStation/pose")
+        ref_pose_topic = rospy.get_param("~ref_pose_topic")
+        state_estimate_topic = rospy.get_param("~state_estimation_topic")
+
+        # Subscribers to state feedback, setpoints and enable flags
+        # rospy.Subscriber(state_feedback_topic, Odometry, self.feedbackCallback)
+        rospy.Subscriber(depth_topic, Float64, self.depthCallback)
+        rospy.Subscriber(pitch_topic, Float64, self.pitchCallback)
+        rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
+        rospy.Subscriber(state_estimate_topic, PoseWithCovarianceStamped, self.estimCallback)
+        # rospy.Subscriber(ref_pose_topic, Pose, self.poseCallback)
+
+        # Publisher to actuators
+        self.rpm1Pub = rospy.Publisher(rpm1_topic, ThrusterRPM, queue_size=10)
+        self.rpm2Pub = rospy.Publisher(rpm2_topic, ThrusterRPM, queue_size=10)
+        self.vecPub = rospy.Publisher(thrust_vector_cmd_topic, ThrusterAngles, queue_size=10)
+        self.vbsPub = rospy.Publisher(vbs_topic, PercentStamped, queue_size=10)
+        self.lcgPub = rospy.Publisher(lcg_topic, PercentStamped, queue_size=10)
+ 
+        self.control_error_pub = rospy.Publisher(control_error_topic, Float64, queue_size=10)
+        
+
+        # TF tree listener        
+        self.listener = tf.TransformListener()
+        self.base_frame = 'sam/base_link/estimated'
+
+        rate = rospy.Rate(self.loop_freq) 
+
         # Run
         while not rospy.is_shutdown():
 
@@ -112,6 +117,16 @@ class P_Controller(object):
     def feedbackCallback(self, odom_fb):
         # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
         self.current_x = self.getEulerFromQuaternion(odom_fb.pose)
+
+    def depthCallback(self, depth):
+        # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
+        # print(depth.data)
+        self.current_x[2] = depth.data
+
+    def pitchCallback(self, pitch):
+        # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
+        self.current_x[4] = pitch.data
+        # print(pitch)
 
     def estimCallback(self, estim):
         # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
