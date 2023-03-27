@@ -31,6 +31,7 @@ class P_Controller(object):
         # Init
         self.current_x = np.array([0., 0., 0.1, 1., 0., 0.])
         self.current_y = np.array([0., 0., 0.1, 1., 0., 0.])
+        self.stateEstim= np.array([0., 0., 0.1, 1., 0., 0.])
         self.refX = 0.
         self.refY = 0.
         self.refZ = 0.
@@ -40,7 +41,7 @@ class P_Controller(object):
         self.ref = np.array([self.refX, self.refY, self.refZ, self.refRoll, self.refPitch, self.refYaw])
 
         # Desired depth and pitch for the experiments (limited to 2D plane)
-        self.depth_desired = 0.
+        self.depth_desired = 1.5    # in NED, bc. the dr/depth is in NED, ie. it's positive
         self.pitch_desired = 0.
 
         self.err = np.array([0., 0., 0., 0., 0., 0.])
@@ -61,9 +62,15 @@ class P_Controller(object):
         self.vecHorizontalNeutral = 0
         self.vecVerticalNeutral = 0
 
+        self.uLimited = np.array([self.thrusterNeutral, 
+                                  self.vecHorizontalNeutral, 
+                                  self.vecVerticalNeutral, 
+                                  self.vbsNeutral, 
+                                  self.lcgNeutral])
+
         # Topics for feedback and actuators
         # state_feedback_topic = rospy.get_param("~state_feedback_topic", "/sam/dr/odom")
-        depth_topic = rospy.get_param("~depth_topic", "/sam/dr/depth")
+        depth_topic = rospy.get_param("~depth_topic", "/sam/dr/depth")      # in NED
         pitch_topic = rospy.get_param("~pitch_topic", "/sam/dr/pitch")
 
         vbs_topic = rospy.get_param("~vbs_topic", "/sam/core/vbs_cmd")
@@ -110,9 +117,9 @@ class P_Controller(object):
 
             u = self.computeControlAction()
 
-            uLimited = self.limitControlAction(u)
+            self.limitControlAction(u)
 
-            self.publishControlAction(uLimited)
+            self.publishControlAction(self.uLimited)
 
             rate.sleep()
 
@@ -147,10 +154,6 @@ class P_Controller(object):
         goal_point.point.x = estimFB.pose.pose.position.x
         goal_point.point.y = estimFB.pose.pose.position.y
         goal_point.point.z = estimFB.pose.pose.position.z
-
-        # goal_point.point.x = estimFB.position.x
-        # goal_point.point.y = estimFB.position.y
-        # goal_point.point.z = estimFB.position.z
 
         try:
             goal_point_local = self.listener.transformPoint(
@@ -284,8 +287,8 @@ class P_Controller(object):
         self.rpm1Pub.publish(thruster1)
         self.rpm2Pub.publish(thruster2)
         self.vecPub.publish(vec)
-        #self.vbsPub.publish(vbs)
-        #self.lcgPub.publish(lcg)
+        self.vbsPub.publish(vbs)
+        self.lcgPub.publish(lcg)
         
         # Publish control inputs and error for visualization
         self.control_error_pub.publish(self.err[5])   
@@ -327,7 +330,7 @@ class P_Controller(object):
         self.integral += self.err * (1/self.loop_freq)
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
-        u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
+        u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
         u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
 
         return u
@@ -355,12 +358,19 @@ class P_Controller(object):
         self.headingAngleInt += self.headingAngle * (1/self.loop_freq)
 
         # Calculate distance to reference pose
-        self.distanceErrPrev = self.distanceErr
-        self.distanceErr = np.sqrt(self.ref[0]**2 + self.ref[1]**2) * np.sign(self.ref[0])
-        self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
-        self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq   
+        # Workaround bc np.sign(0) = 0
+        if np.sign(self.ref[0]) == 0:
+            distanceSign = 1
+        else:
+            distanceSign = np.sign(self.ref[0])
 
-        # Going forwards and backwards based on th distance to the target
+        self.distanceErrPrev = self.distanceErr
+        self.distanceErr = np.sqrt(self.ref[0]**2 + self.ref[1]**2) * distanceSign
+        self.distanceErrInt += self.distanceErr * (1/self.loop_freq)
+        self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq 
+  
+
+        # Going forwards and backwards based on the distance to the target
         if self.distanceErr > 1:
             u[0] = 200
             u[1] = -(Kp[1]*self.headingAngle)# + Ki[1]*self.headingAngleInt)   # PI control vectoring (horizontal)
@@ -373,51 +383,51 @@ class P_Controller(object):
         else:
             u[0] = 0
         u[2] = -(Kp[2]*self.err[2])# + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
-        u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
-        u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
+        u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
+        u[4] = -(Kp[4]*self.err[4])# + Ki[4]*self.integral[4])   # PI control lcg
 
         return u
 
     def limitControlAction(self,u):
         # Enforce hardware limits on actuator control
-        uLimited = u.copy()     # without .copy(), python only makes a shallow copy of the array.
+        self.uLimited = u.copy()     # without .copy(), python only makes a shallow copy of the array.
 
         # thrust vector limit horizontal
-        if uLimited[1] > np.deg2rad(7):
-            uLimited[1] = np.deg2rad(7)
-        elif uLimited[1] < -np.deg2rad(7):
-            uLimited[1] = -np.deg2rad(7)
+        if self.uLimited[1] > np.deg2rad(7):
+            self.uLimited[1] = np.deg2rad(7)
+        elif self.uLimited[1] < -np.deg2rad(7):
+            self.uLimited[1] = -np.deg2rad(7)
 
         # thrust vector limit vertical
-        if uLimited[2] > np.deg2rad(7):
-            uLimited[2] = np.deg2rad(7)
-        elif uLimited[2] < -np.deg2rad(7):
-            uLimited[2] = -np.deg2rad(7)
+        if self.uLimited[2] > np.deg2rad(7):
+            self.uLimited[2] = np.deg2rad(7)
+        elif self.uLimited[2] < -np.deg2rad(7):
+            self.uLimited[2] = -np.deg2rad(7)
 
         # vbs limit
-        if uLimited[3] > 100:
-            uLimited[3] = 100
-        if uLimited[3] < 0:
-            uLimited[3] = 0
+        if self.uLimited[3] > 100:
+            self.uLimited[3] = 100
+        if self.uLimited[3] < 0:
+            self.uLimited[3] = 0
 
         # lcg limit
-        if uLimited[4] > 100:
-            uLimited[4] = 100
-        if uLimited[4] < 0:
-            uLimited[4] = 0
+        if self.uLimited[4] > 100:
+            self.uLimited[4] = 100
+        if self.uLimited[4] < 0:
+            self.uLimited[4] = 0
 
         print("All in ENU:")
         print("[x, y, z, roll, pitch, yaw]")
-        self.printNumpyArray(self.current_x,"Current States (map): %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        # self.printNumpyArray(self.ref,"Reference States (SAM): %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        self.printNumpyArray(self.stateEstim,"Current States (map): %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        self.printNumpyArray(self.ref,"Reference States (SAM): %.4f %.4f %.4f %.4f %.4f %.4f\n")
         # self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
         sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f, Depth Error: %.4f\n" % (self.distanceErr, self.headingAngle, self.err[2]))    
         print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
         sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (u[0], u[1], u[2], u[3], u[4]))
-        sys.stdout.write("Control Input: %.4f %.4f %.4f %.4f %.4f\n"  % (uLimited[0], uLimited[1], uLimited[2], uLimited[3], uLimited[4]))
+        sys.stdout.write("Control Input: %.4f %.4f %.4f %.4f %.4f\n"  % (self.uLimited[0], self.uLimited[1], self.uLimited[2], self.uLimited[3], self.uLimited[4]))
         print("")
 
-        return uLimited
+        # return uLimited
 
     def printNumpyArray(self, array, string):
 

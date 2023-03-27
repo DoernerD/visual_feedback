@@ -65,8 +65,9 @@ if __name__ == "__main__":
             # sam_tfm_ds = tf_buffer.lookup_transform(
             #     'docking_station/base_link', 'sam/base_link', rospy.Time())
 
+            # This only works in stonefish because we have the ground truth!
             sam_tfm_map = tf_buffer.lookup_transform(
-                'map','sam/odom', rospy.Time())
+                'map','sam/base_link', rospy.Time())
                 
             # Apparently pose_msg uses point and tfm_msg uses vector...
             samPose.pose.pose.position.x = sam_tfm_map.transform.translation.x
