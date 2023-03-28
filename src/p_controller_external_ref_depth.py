@@ -32,6 +32,8 @@ class P_Controller(object):
         self.current_x = np.array([0., 0., 0.1, 1., 0., 0.])
         self.current_y = np.array([0., 0., 0.1, 1., 0., 0.])
         self.stateEstim= np.array([0., 0., 0.1, 1., 0., 0.])
+        self.current_pitch = 0.
+        self.current_depth = 0.
         self.refX = 0.
         self.refY = 0.
         self.refZ = 0.
@@ -67,6 +69,7 @@ class P_Controller(object):
                                   self.vecVerticalNeutral, 
                                   self.vbsNeutral, 
                                   self.lcgNeutral])
+        self.antiWindupDifference = np.array([0., 0., 0., 0., 0.])
 
         # Topics for feedback and actuators
         # state_feedback_topic = rospy.get_param("~state_feedback_topic", "/sam/dr/odom")
@@ -78,13 +81,10 @@ class P_Controller(object):
         rpm1_topic = rospy.get_param("~rpm_topic_1", "/sam/core/thruster1_cmd")
         rpm2_topic = rospy.get_param("~rpm_topic_1", "/sam/core/thruster2_cmd")
         thrust_vector_cmd_topic = rospy.get_param("~thrust_vector_cmd_topic", "/sam/core/thrust_vector_cmd")
-        # samPoseTopic = rospy.get_param("~samPoseTopic", "/sam/pose")
 
 
         control_error_topic = rospy.get_param("~control_error_topic", "/sam/ctrl/control_error")
-        # control_input_topic = rospy.get_param("~control_input_topic", "/sam/ctrl/control_input")
 
-        # ref_pose_topic = rospy.get_param("~ref_pose_topic", "/dockingStation/pose")
         ref_pose_topic = rospy.get_param("~ref_pose_topic")
         state_estimate_topic = rospy.get_param("~state_estimation_topic")
 
@@ -94,7 +94,6 @@ class P_Controller(object):
         rospy.Subscriber(pitch_topic, Float64, self.pitchCallback)
         rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
         rospy.Subscriber(state_estimate_topic, PoseWithCovarianceStamped, self.estimCallback)
-        # rospy.Subscriber(ref_pose_topic, Pose, self.poseCallback)
 
         # Publisher to actuators
         self.rpm1Pub = rospy.Publisher(rpm1_topic, ThrusterRPM, queue_size=10)
@@ -119,6 +118,8 @@ class P_Controller(object):
 
             self.limitControlAction(u)
 
+            self.computeAntiWindup(u)
+
             self.publishControlAction(self.uLimited)
 
             rate.sleep()
@@ -132,11 +133,11 @@ class P_Controller(object):
     def depthCallback(self, depth):
         # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
         # print(depth.data)
-        self.current_x[2] = depth.data
+        self.current_depth = depth.data
 
     def pitchCallback(self, pitch):
         # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
-        self.current_x[4] = pitch.data
+        self.current_pitch = pitch.data
         # print(pitch)
 
     def estimCallback(self, estim):
@@ -304,12 +305,11 @@ class P_Controller(object):
         self.ref[2] = self.depth_desired
         self.ref[4] = self.pitch_desired
 
-        # Not sure if the condition works correctly...
-        while ((np.abs(self.current_x[2] - self.ref[2]) >= epsDepth) and (np.abs(self.current_x[4] - self.ref[4]) >= epsPitch)):
-            u = self.computeDepthControlAction()
+        while ((np.abs(self.current_depth - self.ref[2]) <= epsDepth) and (np.abs(self.current_pitch - self.ref[4]) <= epsPitch)):
+            u = self.computeConstVelDepthControlAction()
             return u
  
-        u = self.computeConstVelDepthControlAction()
+        u = self.computeDepthControlAction()
 
         return u
 
@@ -318,20 +318,38 @@ class P_Controller(object):
         # x = [x, y, z, roll, pitch, yaw]  
         u = np.array([0., 0., 0., 0., 50.])
 
-        Kp = np.array([40, 10, 10, 150, 1000])        # P control gain
+        Kp = np.array([40, 10, 10, 150, 1000])      # P control gain
         Ki = np.array([0.5, 0.1, 0.1, 3, 10])       # I control gain
-        Kd = np.array([1., 1., 1., 1., 1.])
+        Kd = np.array([1., 1., 1., 1., 1.])         # D control gain
+        Kaw = np.array([1., 1., 1., 1., 1.])        # Anti-Windup Gain
 
         self.ref[2] = self.depth_desired
         self.ref[4] = self.pitch_desired
 
         self.errPrev = self.err
-        self.err = self.ref - self.current_x
-        self.integral += self.err * (1/self.loop_freq)
+        self.err = self.ref - self.stateEstim
+
+        antiWindupTf = np.array([[1., 0., 0., 0., 0.],
+                                 [0., 1., 0., 0., 0.],
+                                 [0., 0., 1., 1., 0.],
+                                 [0., 0., 0., 0., 0.],
+                                 [0., 0., 0., 1., 1.],
+                                 [0., 1., 0., 0., 0.]])
+        
+        antiWindupError = antiWindupTf.dot(Kaw * self.antiWindupDifference)
+
+        print(antiWindupError)
+
+
+        # enforcing depth and pitch
+        self.err[2] = self.depth_desired - self.current_depth
+        self.err[4] = self.pitch_desired - self.current_pitch
+
+        self.integral += (self.err - antiWindupError) * (1/self.loop_freq)
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
         u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
-        u[4] = -(Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
+        u[4] = (Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
 
         return u
 
@@ -342,16 +360,28 @@ class P_Controller(object):
 
         Kp = np.array([40, 10, 5, 150, 500])        # P control gain
         Ki = np.array([0.5, 0.1, 0.1, 3, 10])       # I control gain
-        Kd = np.array([1., 1., 1., 1., 1.])
+        Kd = np.array([1., 1., 1., 1., 1.])         # D control gain
+        Kaw = np.array([1., 1., 1., 1., 1.])        # Anti-Windup Gain
+
+        antiWindupTf = np.array([[1., 0., 0., 0., 0.],          # x <- thrusters
+                                 [0., 1., 0., 0., 0.],          # y <- vec horizontal
+                                 [0., 0., 1., 1., 0.],          # z <- vec vertical + vbs
+                                 [0., 0., 0., 0., 0.],          # roll <- rcg (not available)
+                                 [0., 0., 0., 1., 1.],          # pitch <- vbs + lcg
+                                 [0., 1., 0., 0., 0.]])         # yaw <- vec horizontal
+        
+        antiWindupError = antiWindupTf.dot(Kaw * self.antiWindupDifference)
+
+        print(antiWindupError)
 
         self.errPrev = self.err
-        self.err = self.ref - self.current_x
+        self.err = self.ref - self.stateEstim
 
         # enforcing depth and pitch
-        self.err[2] = self.depth_desired - self.current_x[2]
-        self.err[4] = self.pitch_desired - self.current_x[4]
+        self.err[2] = self.depth_desired - self.current_depth
+        self.err[4] = self.pitch_desired - self.current_pitch
 
-        self.integral += self.err * (1/self.loop_freq)
+        self.integral += (self.err - antiWindupError) * (1/self.loop_freq)
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
         self.headingAngle = math.atan2(self.ref[1], self.ref[0])
@@ -370,21 +400,22 @@ class P_Controller(object):
         self.distanceErrDeriv = (self.distanceErr - self.distanceErrPrev) * self.loop_freq 
   
 
+        # Compute control action u
         # Going forwards and backwards based on the distance to the target
         if self.distanceErr > 1:
             u[0] = 200
-            u[1] = -(Kp[1]*self.headingAngle)# + Ki[1]*self.headingAngleInt)   # PI control vectoring (horizontal)
+            u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt)   # PI control vectoring (horizontal)
 
         elif self.distanceErr < -1:
             u[0] = -200
             self.headingAngleScaled = np.sign(self.headingAngle) * (np.pi - np.abs(self.headingAngle))
-            u[1] = -(Kp[1]*self.headingAngleScaled)# - Ki[1]*self.headingAngleInt)   # PI control vectoring (horizontal)
+            u[1] = -(Kp[1]*self.headingAngleScaled - Ki[1]*self.headingAngleInt)   # PI control vectoring (horizontal)
 
         else:
             u[0] = 0
-        u[2] = -(Kp[2]*self.err[2])# + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
+        u[2] = -(Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
         u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
-        u[4] = -(Kp[4]*self.err[4])# + Ki[4]*self.integral[4])   # PI control lcg
+        u[4] = (Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
 
         return u
 
@@ -432,6 +463,9 @@ class P_Controller(object):
     def printNumpyArray(self, array, string):
 
         sys.stdout.write(string % (array[0], array[1], array[2], array[3], array[4], array[5]))
+
+    def computeAntiWindup(self,u):
+        self.antiWindupDifference = u - self.uLimited
         
 
 if __name__ == "__main__":
