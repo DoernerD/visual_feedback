@@ -70,6 +70,7 @@ class P_Controller(object):
                                   self.vbsNeutral, 
                                   self.lcgNeutral])
         self.antiWindupDifference = np.array([0., 0., 0., 0., 0.])
+        self.antiWindupDifferenceInt = np.array([0., 0., 0., 0., 0.])
 
         # Topics for feedback and actuators
         # state_feedback_topic = rospy.get_param("~state_feedback_topic", "/sam/dr/odom")
@@ -143,6 +144,8 @@ class P_Controller(object):
     def estimCallback(self, estim):
         # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
         self.stateEstim = self.getEulerFromQuaternion(estim.pose)
+        self.stateEstim[2] = self.current_depth
+        self.stateEstim[4] = self.current_pitch
 
     def poseCallback(self,estimFB):
         # Get way point in map frame
@@ -318,10 +321,10 @@ class P_Controller(object):
         # x = [x, y, z, roll, pitch, yaw]  
         u = np.array([0., 0., 0., 0., 50.])
 
-        Kp = np.array([40, 10, 10, 150, 1000])      # P control gain
-        Ki = np.array([0.5, 0.1, 0.1, 3, 10])       # I control gain
+        Kp = np.array([40, 5, 5, 100, 500])      # P control gain
+        Ki = np.array([0.5, 0.1, 0.1, 2, 10])       # I control gain
         Kd = np.array([1., 1., 1., 1., 1.])         # D control gain
-        Kaw = np.array([1., 1., 1., 1., 1.])        # Anti-Windup Gain
+        Kaw = np.array([1., 1., 1., 4., 1.])        # Anti-Windup Gain
 
         self.ref[2] = self.depth_desired
         self.ref[4] = self.pitch_desired
@@ -329,27 +332,21 @@ class P_Controller(object):
         self.errPrev = self.err
         self.err = self.ref - self.stateEstim
 
-        antiWindupTf = np.array([[1., 0., 0., 0., 0.],
-                                 [0., 1., 0., 0., 0.],
-                                 [0., 0., 1., 1., 0.],
-                                 [0., 0., 0., 0., 0.],
-                                 [0., 0., 0., 1., 1.],
-                                 [0., 1., 0., 0., 0.]])
-        
-        antiWindupError = antiWindupTf.dot(Kaw * self.antiWindupDifference)
-
-        print(antiWindupError)
-
+        # We need to integrate the anti windup before adding it to the error
+        # because multiple actuators affect the same error. That way we can
+        # use the correct actuator anti windup for each actuator
+        self.calcAntiWindupIntegral()
 
         # enforcing depth and pitch
         self.err[2] = self.depth_desired - self.current_depth
         self.err[4] = self.pitch_desired - self.current_pitch
 
-        self.integral += (self.err - antiWindupError) * (1/self.loop_freq)
+        self.integral += (self.err) * (1/self.loop_freq)
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
-        u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
-        u[4] = (Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
+        # u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
+        u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2] + Kaw[3]*self.antiWindupDifferenceInt[3])   # PI control vbs
+        u[4] = -(Kp[4]*self.err[4] - Ki[4]*self.integral[4] - Kaw[4]*self.antiWindupDifferenceInt[4])   # PI control lcg
 
         return u
 
@@ -358,21 +355,15 @@ class P_Controller(object):
         # x = [x, y, z, roll, pitch, yaw]  
         u = np.array([0., 0., 0., 0., 50.])
 
-        Kp = np.array([40, 10, 5, 150, 500])        # P control gain
-        Ki = np.array([0.5, 0.1, 0.1, 3, 10])       # I control gain
+        Kp = np.array([40, 5, 5, 100, 500])        # P control gain
+        Ki = np.array([0.5, 0.1, 0.1, 2, 10])       # I control gain
         Kd = np.array([1., 1., 1., 1., 1.])         # D control gain
-        Kaw = np.array([1., 1., 1., 1., 1.])        # Anti-Windup Gain
-
-        antiWindupTf = np.array([[1., 0., 0., 0., 0.],          # x <- thrusters
-                                 [0., 1., 0., 0., 0.],          # y <- vec horizontal
-                                 [0., 0., 1., 1., 0.],          # z <- vec vertical + vbs
-                                 [0., 0., 0., 0., 0.],          # roll <- rcg (not available)
-                                 [0., 0., 0., 1., 1.],          # pitch <- vbs + lcg
-                                 [0., 1., 0., 0., 0.]])         # yaw <- vec horizontal
+        Kaw = np.array([1., 1., 1., 4., 1.])        # Anti-Windup Gain
         
-        antiWindupError = antiWindupTf.dot(Kaw * self.antiWindupDifference)
-
-        print(antiWindupError)
+        # We need to integrate the anti windup before adding it to the error
+        # because multiple actuators affect the same error. That way we can
+        # use the correct actuator anti windup for each actuator
+        self.calcAntiWindupIntegral()
 
         self.errPrev = self.err
         self.err = self.ref - self.stateEstim
@@ -381,7 +372,8 @@ class P_Controller(object):
         self.err[2] = self.depth_desired - self.current_depth
         self.err[4] = self.pitch_desired - self.current_pitch
 
-        self.integral += (self.err - antiWindupError) * (1/self.loop_freq)
+        # self.integral += (self.err - antiWindupError) * (1/self.loop_freq)
+        self.integral += (self.err) * (1/self.loop_freq)
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
         self.headingAngle = math.atan2(self.ref[1], self.ref[0])
@@ -404,20 +396,23 @@ class P_Controller(object):
         # Going forwards and backwards based on the distance to the target
         if self.distanceErr > 1:
             u[0] = 200
-            u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt)   # PI control vectoring (horizontal)
+            u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt - Kaw[1]*self.antiWindupDifferenceInt[1])   # PI control vectoring (horizontal)
 
         elif self.distanceErr < -1:
             u[0] = -200
             self.headingAngleScaled = np.sign(self.headingAngle) * (np.pi - np.abs(self.headingAngle))
-            u[1] = -(Kp[1]*self.headingAngleScaled - Ki[1]*self.headingAngleInt)   # PI control vectoring (horizontal)
+            u[1] = -(Kp[1]*self.headingAngleScaled - (Ki[1]*self.headingAngleInt - Kaw[1]*self.antiWindupDifferenceInt[1]))   # PI control vectoring (horizontal)
 
         else:
             u[0] = 0
-        u[2] = -(Kp[2]*self.err[2] + Ki[2]*self.integral[2])   # PI control vectoring (vertical)
-        u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
-        u[4] = (Kp[4]*self.err[4] + Ki[4]*self.integral[4])   # PI control lcg
+        u[2] = (Kp[2]*self.err[2] + Ki[2]*self.integral[2] + Kaw[2]*self.antiWindupDifferenceInt[2])   # PI control vectoring (vertical)
+        u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2] + Kaw[3]*self.antiWindupDifferenceInt[3])   # PI control vbs
+        u[4] = -(Kp[4]*self.err[4] - Ki[4]*self.integral[4] - Kaw[4]*self.antiWindupDifferenceInt[4])   # PI control lcg
 
         return u
+    
+    def calcAntiWindupIntegral(self):
+        self.antiWindupDifferenceInt += (self.antiWindupDifference) * (1/self.loop_freq)
 
     def limitControlAction(self,u):
         # Enforce hardware limits on actuator control
@@ -452,10 +447,17 @@ class P_Controller(object):
         self.printNumpyArray(self.stateEstim,"Current States (map): %.4f %.4f %.4f %.4f %.4f %.4f\n")
         self.printNumpyArray(self.ref,"Reference States (SAM): %.4f %.4f %.4f %.4f %.4f %.4f\n")
         # self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f, Depth Error: %.4f\n" % (self.distanceErr, self.headingAngle, self.err[2]))    
+        sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f, Depth Error: %.4f\n" 
+                         % (self.distanceErr, self.headingAngle, self.err[2]))    
         print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
-        sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  % (u[0], u[1], u[2], u[3], u[4]))
-        sys.stdout.write("Control Input: %.4f %.4f %.4f %.4f %.4f\n"  % (self.uLimited[0], self.uLimited[1], self.uLimited[2], self.uLimited[3], self.uLimited[4]))
+        sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  
+                         % (u[0], u[1], u[2], u[3], u[4]))
+        sys.stdout.write("Control Input: %.4f %.4f %.4f %.4f %.4f\n"  
+                         % (self.uLimited[0], self.uLimited[1], self.uLimited[2], self.uLimited[3], self.uLimited[4]))
+        sys.stdout.write("Anti Windup Int: %.4f %.4f %.4f %.4f %.4f\n"  
+                         % (self.antiWindupDifferenceInt[0], self.antiWindupDifferenceInt[1], 
+                            self.antiWindupDifferenceInt[2], self.antiWindupDifferenceInt[3], 
+                            self.antiWindupDifferenceInt[4]))
         print("")
 
         # return uLimited
@@ -465,7 +467,7 @@ class P_Controller(object):
         sys.stdout.write(string % (array[0], array[1], array[2], array[3], array[4], array[5]))
 
     def computeAntiWindup(self,u):
-        self.antiWindupDifference = u - self.uLimited
+        self.antiWindupDifference = self.uLimited - u
         
 
 if __name__ == "__main__":
