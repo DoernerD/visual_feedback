@@ -43,7 +43,7 @@ class P_Controller(object):
         self.ref = np.array([self.refX, self.refY, self.refZ, self.refRoll, self.refPitch, self.refYaw])
 
         # Desired depth and pitch for the experiments (limited to 2D plane)
-        self.depth_desired = 1.5    # in NED, bc. the dr/depth is in NED, ie. it's positive
+        self.depth_desired = 0.    # in NED, bc. the dr/depth is in NED, ie. it's positive
         self.pitch_desired = 0.
 
         self.err = np.array([0., 0., 0., 0., 0., 0.])
