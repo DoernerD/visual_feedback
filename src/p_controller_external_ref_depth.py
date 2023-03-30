@@ -401,7 +401,7 @@ class P_Controller(object):
         elif self.distanceErr < -1:
             u[0] = -200
             self.headingAngleScaled = np.sign(self.headingAngle) * (np.pi - np.abs(self.headingAngle))
-            u[1] = -(Kp[1]*self.headingAngleScaled - (Ki[1]*self.headingAngleInt - Kaw[1]*self.antiWindupDifferenceInt[1]))   # PI control vectoring (horizontal)
+            u[1] = -(Kp[1]*self.headingAngleScaled - (Ki[1]*self.headingAngleInt + Kaw[1]*self.antiWindupDifferenceInt[1]))   # PI control vectoring (horizontal)
 
         else:
             u[0] = 0
