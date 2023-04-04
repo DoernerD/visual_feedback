@@ -43,7 +43,7 @@ class P_Controller(object):
         self.ref = np.array([self.refX, self.refY, self.refZ, self.refRoll, self.refPitch, self.refYaw])
 
         # Desired depth and pitch for the experiments (limited to 2D plane)
-        self.depth_desired = 0.    # in NED, bc. the dr/depth is in NED, ie. it's positive
+        self.depth_desired = 1.8    # in NED, bc. the dr/depth is in NED, ie. it's positive
         self.pitch_desired = 0.
 
         self.err = np.array([0., 0., 0., 0., 0., 0.])
@@ -58,8 +58,8 @@ class P_Controller(object):
         self.headingAngleInt = 0.
 
         # Neutral actuator inputs
-        self.vbsNeutral = 50
-        self.lcgNeutral = 50
+        self.vbsNeutral = 30
+        self.lcgNeutral = 90
         self.thrusterNeutral = 0
         self.vecHorizontalNeutral = 0
         self.vecVerticalNeutral = 0
@@ -321,9 +321,10 @@ class P_Controller(object):
         # x = [x, y, z, roll, pitch, yaw]  
         u = np.array([0., 0., 0., 0., 50.])
 
-        Kp = np.array([40, 5, 5, 100, 500])      # P control gain
-        Ki = np.array([0.5, 0.1, 0.1, 2, 10])       # I control gain
-        Kd = np.array([1., 1., 1., 1., 1.])         # D control gain
+        Kp = np.array([40, 5, 5, 40, 60])      # P control gain
+        # Ki = np.array([0.5, 0.1, 0.1, 0.75, 1.25])       # I control gain
+        Ki = np.array([0., 0., 0., 0., 0.])       # I control gain
+        Kd = np.array([1., 1., 1., 1., 6.])         # D control gain
         Kaw = np.array([1., 1., 1., 4., 1.])        # Anti-Windup Gain
 
         self.ref[2] = self.depth_desired
@@ -345,8 +346,9 @@ class P_Controller(object):
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
         # u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
-        u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2] + Kaw[3]*self.antiWindupDifferenceInt[3])   # PI control vbs
-        u[4] = -(Kp[4]*self.err[4] - Ki[4]*self.integral[4] - Kaw[4]*self.antiWindupDifferenceInt[4])   # PI control lcg
+        u[3] = (Kp[3]*self.err[2] + self.vbsNeutral + Ki[3]*self.integral[2] + Kaw[3]*self.antiWindupDifferenceInt[3])   # PI control vbs
+        # u[4] = -(Kp[4]*self.err[4] + self.lcgNeutral - Ki[4]*self.integral[4] - Kaw[4]*self.antiWindupDifferenceInt[4])   # PI control lcg
+        u[4] = (Kp[4]*self.err[4] + self.lcgNeutral + Kd[4]*self.deriv[4])   # PD control lcg
 
         return u
 
@@ -355,10 +357,16 @@ class P_Controller(object):
         # x = [x, y, z, roll, pitch, yaw]  
         u = np.array([0., 0., 0., 0., 50.])
 
-        Kp = np.array([40, 5, 5, 100, 500])        # P control gain
-        Ki = np.array([0.5, 0.1, 0.1, 2, 10])       # I control gain
-        Kd = np.array([1., 1., 1., 1., 1.])         # D control gain
+        Kp = np.array([40, 5, 5, 40, 60])      # P control gain
+        # Ki = np.array([0.5, 0.1, 0.1, 0.75, 1.25])       # I control gain
+        Ki = np.array([0., 0., 0., 0., 0.])       # I control gain
+        Kd = np.array([1., 1., 1., 1., 6.])         # D control gain
         Kaw = np.array([1., 1., 1., 4., 1.])        # Anti-Windup Gain
+
+        # Kp = np.array([40, 5, 5, 100, 50])        # P control gain
+        # Ki = np.array([0.5, 0.1, 0.1, 2, 1])       # I control gain
+        # Kd = np.array([1., 1., 1., 1., 1.])         # D control gain
+        # Kaw = np.array([1., 1., 1., 4., 1.])        # Anti-Windup Gain
         
         # We need to integrate the anti windup before adding it to the error
         # because multiple actuators affect the same error. That way we can
