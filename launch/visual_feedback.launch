@@ -7,7 +7,8 @@
 
     <!-- topics, note the root! -->
     <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" />
-    <arg name="depth_topic" default="/$(arg robot_name)/dr/depth" />
+    <arg name="press_topic" default="/$(arg robot_name)/core/depth20_pressure" />
+    <arg name="pitch_topic" default="/$(arg robot_name)/sbg/ekf_euler" />
 
     <arg name="state_estimation_topic" default="/$(arg robot_name)/EstimatedPose" />
 
@@ -57,7 +58,8 @@
         <param name="ref_pose_topic" value="$(arg ref_pose_topic)" />
 
         <param name="state_feedback_topic" value="$(arg state_feedback_topic)" />
-        <param name="depth_topic" value="$(arg depth_topic)" />
+        <param name="press_topic" value="$(arg press_topic)" />
+        <param name="pitch_topic" value="$(arg pitch_topic)" />
         <param name="state_estimation_topic" value="$(arg state_estimation_topic)" />
         <param name="vbs_topic" value="$(arg vbs_topic)" />
         <param name="control_error_topic" value="$(arg control_error_topic)" />

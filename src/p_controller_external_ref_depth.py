@@ -15,6 +15,8 @@ from smarc_msgs.msg import ThrusterRPM
 from sam_msgs.msg import ThrusterAngles, PercentStamped
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Pose, PointStamped
+from sbg_driver.msg import SbgEkfEuler
+from sensor_msgs.msg import FluidPressure
 
 
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_matrix, quaternion_from_matrix
@@ -63,6 +65,7 @@ class P_Controller(object):
         self.thrusterNeutral = 0
         self.vecHorizontalNeutral = 0
         self.vecVerticalNeutral = 0
+        self.current_depth = 0.
 
         self.uLimited = np.array([self.thrusterNeutral, 
                                   self.vecHorizontalNeutral, 
@@ -74,8 +77,8 @@ class P_Controller(object):
 
         # Topics for feedback and actuators
         # state_feedback_topic = rospy.get_param("~state_feedback_topic", "/sam/dr/odom")
-        depth_topic = rospy.get_param("~depth_topic", "/sam/dr/depth")      # in NED
-        pitch_topic = rospy.get_param("~pitch_topic", "/sam/dr/pitch")
+        press_topic = rospy.get_param("~press_topic", "/sam/core/depth20_pressure")      # in NED
+        pitch_topic = rospy.get_param("~pitch_topic", "/sam/sbg/ekf_euler")
 
         vbs_topic = rospy.get_param("~vbs_topic", "/sam/core/vbs_cmd")
         lcg_topic = rospy.get_param("~lcg_topic", "/sam/core/lcg_cmd")
@@ -91,9 +94,10 @@ class P_Controller(object):
 
         # Subscribers to state feedback, setpoints and enable flags
         # rospy.Subscriber(state_feedback_topic, Odometry, self.feedbackCallback)
-        rospy.Subscriber(depth_topic, Float64, self.depthCallback)
-        rospy.Subscriber(pitch_topic, Float64, self.pitchCallback)
+        # rospy.Subscriber(depth_topic, Float64, self.depthCallback)
+        rospy.Subscriber(pitch_topic, SbgEkfEuler, self.pitchCallback)
         rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.poseCallback)
+        rospy.Subscriber(press_topic, FluidPressure, self.depthCB)
         rospy.Subscriber(state_estimate_topic, PoseWithCovarianceStamped, self.estimCallback)
 
         # Publisher to actuators
@@ -131,14 +135,14 @@ class P_Controller(object):
         # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
         self.current_x = self.getEulerFromQuaternion(odom_fb.pose)
 
-    def depthCallback(self, depth):
-        # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
-        # print(depth.data)
-        self.current_depth = depth.data
+    # def depthCallback(self, depth):
+    #     # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
+    #     # print(depth.data)
+    #     self.current_depth = depth.data
 
     def pitchCallback(self, pitch):
         # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
-        self.current_pitch = pitch.data
+        self.current_pitch = -pitch.angle.y
         # print(pitch)
 
     def estimCallback(self, estim):
@@ -146,6 +150,18 @@ class P_Controller(object):
         self.stateEstim = self.getEulerFromQuaternion(estim.pose)
         self.stateEstim[2] = self.current_depth
         self.stateEstim[4] = self.current_pitch
+
+    def pascal_pressure_to_depth(self, pressure):
+		return 10.*((pressure / 100000.) - 1.) # 117000 -> 1.7
+
+    def depthCB(self, press_msg):
+        # # depth_abs is positive, must be manually negated
+        depth_abs = self.pascal_pressure_to_depth(press_msg.fluid_pressure)
+        # rospy.loginfo("Depth abs %s", depth_abs)
+        # rospy.loginfo("Fluid press %s", press_msg.fluid_pressure)
+
+        if press_msg.fluid_pressure > 90000. and press_msg.fluid_pressure < 500000.:
+            self.current_depth = depth_abs # = [0., 0., 2.]
 
     def poseCallback(self,estimFB):
         # Get way point in map frame
@@ -302,7 +318,7 @@ class P_Controller(object):
     def computeControlAction(self):
         # Sliding Mode Control for Depth First control
         epsDepth = 0.4 # offset for depth control
-        epsPitch = 0.05 # offset for pitch control
+        epsPitch = np.deg2rad(5) # offset for pitch control
 
         # enforcing depth and pitch rather than using the docking station estimate.
         self.ref[2] = self.depth_desired
@@ -321,12 +337,13 @@ class P_Controller(object):
         # x = [x, y, z, roll, pitch, yaw]  
         u = np.array([0., 0., 0., 0., 50.])
 
+        ## TANK PARAMETERS
         Kp = np.array([40, 5, 5, 40, 60])      # P control gain
         # Ki = np.array([0.5, 0.1, 0.1, 0.75, 1.25])       # I control gain
         Ki = np.array([0., 0., 0., 0., 0.])       # I control gain
         Kd = np.array([1., 1., 1., 1., 6.])         # D control gain
-        Kaw = np.array([1., 1., 1., 4., 1.])        # Anti-Windup Gain
-
+        #Kaw = np.array([1., 1., 1., 0., 1.])        # Anti-Windup Gain
+        Kaw = np.zeros(5)
         self.ref[2] = self.depth_desired
         self.ref[4] = self.pitch_desired
 
@@ -345,9 +362,12 @@ class P_Controller(object):
         self.integral += (self.err) * (1/self.loop_freq)
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
+        ## SIM CONTROLLER
         # u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
-        u[3] = (Kp[3]*self.err[2] + self.vbsNeutral + Ki[3]*self.integral[2] + Kaw[3]*self.antiWindupDifferenceInt[3])   # PI control vbs
         # u[4] = -(Kp[4]*self.err[4] + self.lcgNeutral - Ki[4]*self.integral[4] - Kaw[4]*self.antiWindupDifferenceInt[4])   # PI control lcg
+
+        ## TANK CONTROLLER
+        u[3] = (Kp[3]*self.err[2] + self.vbsNeutral + Ki[3]*self.integral[2] + Kaw[3]*self.antiWindupDifferenceInt[3])   # PI control vbs
         u[4] = (Kp[4]*self.err[4] + self.lcgNeutral + Kd[4]*self.deriv[4])   # PD control lcg
 
         return u
@@ -357,12 +377,15 @@ class P_Controller(object):
         # x = [x, y, z, roll, pitch, yaw]  
         u = np.array([0., 0., 0., 0., 50.])
 
+        # TANK PARAMETERS
         Kp = np.array([40, 5, 5, 40, 60])      # P control gain
         # Ki = np.array([0.5, 0.1, 0.1, 0.75, 1.25])       # I control gain
         Ki = np.array([0., 0., 0., 0., 0.])       # I control gain
         Kd = np.array([1., 1., 1., 1., 6.])         # D control gain
-        Kaw = np.array([1., 1., 1., 4., 1.])        # Anti-Windup Gain
+        #Kaw = np.array([1., 1., 1., 0., 1.])        # Anti-Windup Gain
+        Kaw = np.zeros(5)
 
+        # SIM PARAMETERS
         # Kp = np.array([40, 5, 5, 100, 50])        # P control gain
         # Ki = np.array([0.5, 0.1, 0.1, 2, 1])       # I control gain
         # Kd = np.array([1., 1., 1., 1., 1.])         # D control gain
@@ -413,9 +436,15 @@ class P_Controller(object):
 
         else:
             u[0] = 0
-        u[2] = (Kp[2]*self.err[2] + Ki[2]*self.integral[2] + Kaw[2]*self.antiWindupDifferenceInt[2])   # PI control vectoring (vertical)
-        u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2] + Kaw[3]*self.antiWindupDifferenceInt[3])   # PI control vbs
-        u[4] = -(Kp[4]*self.err[4] - Ki[4]*self.integral[4] - Kaw[4]*self.antiWindupDifferenceInt[4])   # PI control lcg
+        # u[2] = (Kp[2]*self.err[2] + Ki[2]*self.integral[2] + Kaw[2]*self.antiWindupDifferenceInt[2])   # PI control vectoring (vertical)
+        
+        # SIM CONTROLLER
+        # u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2] + Kaw[3]*self.antiWindupDifferenceInt[3])   # PI control vbs
+        # u[4] = -(Kp[4]*self.err[4] - Ki[4]*self.integral[4] - Kaw[4]*self.antiWindupDifferenceInt[4])   # PI control lcg
+
+        # TANK CONTROLLER
+        u[3] = (Kp[3]*self.err[2] + self.vbsNeutral + Ki[3]*self.integral[2] + Kaw[3]*self.antiWindupDifferenceInt[3])   # PI control vbs
+        u[4] = (Kp[4]*self.err[4] + self.lcgNeutral + Kd[4]*self.deriv[4])   # PD control lcg
 
         return u
     
@@ -450,22 +479,22 @@ class P_Controller(object):
         if self.uLimited[4] < 0:
             self.uLimited[4] = 0
 
-        print("All in ENU:")
-        print("[x, y, z, roll, pitch, yaw]")
+        # print("All in ENU:")
+        # print("[x, y, z, roll, pitch, yaw]")
         self.printNumpyArray(self.stateEstim,"Current States (map): %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        self.printNumpyArray(self.ref,"Reference States (SAM): %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        # self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f, Depth Error: %.4f\n" 
-                         % (self.distanceErr, self.headingAngle, self.err[2]))    
-        print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
-        sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  
-                         % (u[0], u[1], u[2], u[3], u[4]))
-        sys.stdout.write("Control Input: %.4f %.4f %.4f %.4f %.4f\n"  
-                         % (self.uLimited[0], self.uLimited[1], self.uLimited[2], self.uLimited[3], self.uLimited[4]))
-        sys.stdout.write("Anti Windup Int: %.4f %.4f %.4f %.4f %.4f\n"  
-                         % (self.antiWindupDifferenceInt[0], self.antiWindupDifferenceInt[1], 
-                            self.antiWindupDifferenceInt[2], self.antiWindupDifferenceInt[3], 
-                            self.antiWindupDifferenceInt[4]))
+        # self.printNumpyArray(self.ref,"Reference States (SAM): %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        # # self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
+        # sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f, Depth Error: %.4f\n" 
+        #                  % (self.distanceErr, self.headingAngle, self.err[2]))    
+        # print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
+        # sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  
+        #                  % (u[0], u[1], u[2], u[3], u[4]))
+        # sys.stdout.write("Control Input: %.4f %.4f %.4f %.4f %.4f\n"  
+        #                  % (self.uLimited[0], self.uLimited[1], self.uLimited[2], self.uLimited[3], self.uLimited[4]))
+        # sys.stdout.write("Anti Windup Int: %.4f %.4f %.4f %.4f %.4f\n"  
+        #                  % (self.antiWindupDifferenceInt[0], self.antiWindupDifferenceInt[1], 
+        #                     self.antiWindupDifferenceInt[2], self.antiWindupDifferenceInt[3], 
+        #                     self.antiWindupDifferenceInt[4]))
         print("")
 
         # return uLimited
