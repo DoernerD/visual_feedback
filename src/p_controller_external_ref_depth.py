@@ -45,7 +45,7 @@ class P_Controller(object):
         self.ref = np.array([self.refX, self.refY, self.refZ, self.refRoll, self.refPitch, self.refYaw])
 
         # Desired depth and pitch for the experiments (limited to 2D plane)
-        self.depth_desired = 1.8    # in NED, bc. the dr/depth is in NED, ie. it's positive
+        self.depth_desired = 0.#1.8    # in NED, bc. the dr/depth is in NED, ie. it's positive
         self.pitch_desired = 0.
 
         self.err = np.array([0., 0., 0., 0., 0., 0.])
@@ -75,6 +75,8 @@ class P_Controller(object):
         self.antiWindupDifference = np.array([0., 0., 0., 0., 0.])
         self.antiWindupDifferenceInt = np.array([0., 0., 0., 0., 0.])
 
+        self.cnt = 0
+
         # Topics for feedback and actuators
         # state_feedback_topic = rospy.get_param("~state_feedback_topic", "/sam/dr/odom")
         press_topic = rospy.get_param("~press_topic", "/sam/core/depth20_pressure")      # in NED
@@ -101,8 +103,8 @@ class P_Controller(object):
         rospy.Subscriber(state_estimate_topic, PoseWithCovarianceStamped, self.estimCallback)
 
         # Publisher to actuators
-        self.rpm1Pub = rospy.Publisher(rpm1_topic, ThrusterRPM, queue_size=10)
-        self.rpm2Pub = rospy.Publisher(rpm2_topic, ThrusterRPM, queue_size=10)
+        self.rpm1Pub = rospy.Publisher(rpm1_topic, ThrusterRPM, queue_size=1)
+        self.rpm2Pub = rospy.Publisher(rpm2_topic, ThrusterRPM, queue_size=1)
         self.vecPub = rospy.Publisher(thrust_vector_cmd_topic, ThrusterAngles, queue_size=10)
         self.vbsPub = rospy.Publisher(vbs_topic, PercentStamped, queue_size=10)
         self.lcgPub = rospy.Publisher(lcg_topic, PercentStamped, queue_size=10)
@@ -318,7 +320,7 @@ class P_Controller(object):
     def computeControlAction(self):
         # Sliding Mode Control for Depth First control
         epsDepth = 0.4 # offset for depth control
-        epsPitch = np.deg2rad(5) # offset for pitch control
+        epsPitch = 0.2 #np.deg2rad(5) # offset for pitch control
 
         # enforcing depth and pitch rather than using the docking station estimate.
         self.ref[2] = self.depth_desired
@@ -425,11 +427,12 @@ class P_Controller(object):
 
         # Compute control action u
         # Going forwards and backwards based on the distance to the target
-        if self.distanceErr > 1:
+        stopRadius = 0.2
+        if self.distanceErr > stopRadius:
             u[0] = 200
             u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt - Kaw[1]*self.antiWindupDifferenceInt[1])   # PI control vectoring (horizontal)
 
-        elif self.distanceErr < -1:
+        elif self.distanceErr < -stopRadius:
             u[0] = -200
             self.headingAngleScaled = np.sign(self.headingAngle) * (np.pi - np.abs(self.headingAngle))
             u[1] = -(Kp[1]*self.headingAngleScaled - (Ki[1]*self.headingAngleInt + Kaw[1]*self.antiWindupDifferenceInt[1]))   # PI control vectoring (horizontal)
@@ -479,23 +482,25 @@ class P_Controller(object):
         if self.uLimited[4] < 0:
             self.uLimited[4] = 0
 
-        # print("All in ENU:")
-        # print("[x, y, z, roll, pitch, yaw]")
-        self.printNumpyArray(self.stateEstim,"Current States (map): %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        # self.printNumpyArray(self.ref,"Reference States (SAM): %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        # # self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
-        # sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f, Depth Error: %.4f\n" 
-        #                  % (self.distanceErr, self.headingAngle, self.err[2]))    
-        # print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
-        # sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  
-        #                  % (u[0], u[1], u[2], u[3], u[4]))
-        # sys.stdout.write("Control Input: %.4f %.4f %.4f %.4f %.4f\n"  
-        #                  % (self.uLimited[0], self.uLimited[1], self.uLimited[2], self.uLimited[3], self.uLimited[4]))
-        # sys.stdout.write("Anti Windup Int: %.4f %.4f %.4f %.4f %.4f\n"  
-        #                  % (self.antiWindupDifferenceInt[0], self.antiWindupDifferenceInt[1], 
-        #                     self.antiWindupDifferenceInt[2], self.antiWindupDifferenceInt[3], 
-        #                     self.antiWindupDifferenceInt[4]))
-        print("")
+        self.cnt += 1
+        if self.cnt % 20 == 1:
+            # print("All in ENU:")
+            # print("[x, y, z, roll, pitch, yaw]")
+            self.printNumpyArray(self.stateEstim,"Current States (map): %.4f %.4f %.4f %.4f %.4f %.4f\n")
+            # self.printNumpyArray(self.ref,"Reference States (SAM): %.4f %.4f %.4f %.4f %.4f %.4f\n")
+            # # self.printNumpyArray(self.err,"Control Error: %.4f %.4f %.4f %.4f %.4f %.4f\n")
+            # sys.stdout.write("Distance Error: %.4f, Heading Angle: %.4f, Depth Error: %.4f\n" 
+            #                  % (self.distanceErr, self.headingAngle, self.err[2]))    
+            # print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
+            # sys.stdout.write("Control Input raw: %.4f %.4f %.4f %.4f %.4f\n"  
+            #                  % (u[0], u[1], u[2], u[3], u[4]))
+            sys.stdout.write("Control Input: %.4f %.4f %.4f %.4f %.4f\n"  
+                             % (self.uLimited[0], self.uLimited[1], self.uLimited[2], self.uLimited[3], self.uLimited[4]))
+            # sys.stdout.write("Anti Windup Int: %.4f %.4f %.4f %.4f %.4f\n"  
+            #                  % (self.antiWindupDifferenceInt[0], self.antiWindupDifferenceInt[1], 
+            #                     self.antiWindupDifferenceInt[2], self.antiWindupDifferenceInt[3], 
+            #                     self.antiWindupDifferenceInt[4]))
+            print("")
 
         # return uLimited
 
