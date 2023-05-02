@@ -1,0 +1,37 @@
+# SAM Parameters
+
+# Actuator Limits
+maxRpm : 2000
+maxThrustVectorRadians : 0.122
+
+# Neutral Positions
+# These depend on the weight distribution of SAM. Check before running experiments
+vbsNeutral : 30
+lcgNeutral : 70
+
+# Controller Gains
+thrusterKp : 40
+thrusterKi : 0
+thrusterKd : 1
+thrusterKaw : 0
+
+vecHorizontalKp : 5
+vecHorizontalKi : 0
+vecHorizontalKd : 1
+vecHorizontalKaw : 0
+
+vecVerticalKp : 5
+vecVerticalKi : 0
+vecVerticalKd : 1
+vecVerticalKaw : 0
+
+vbsKp : 40
+vbsKi : 0
+vbsKd : 1
+vbsKaw : 0
+
+lcgKp : 60
+lcgKi : 0
+lcgKd : 6
+lcgKaw : 0
+
