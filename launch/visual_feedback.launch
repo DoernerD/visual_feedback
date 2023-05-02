@@ -4,6 +4,7 @@
     <arg name="robot_name" default="sam"/>
 
     <arg name="loop_freq" default="20."/>
+    <arg name="verbose_arg" default="True"/>
 
     <!-- topics, note the root! -->
     <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" />
@@ -13,9 +14,6 @@
     <arg name="state_estimation_topic" default="/$(arg robot_name)/EstimatedPose" />
 
     <arg name="vbs_topic" default="/$(arg robot_name)/core/vbs_cmd" />
-
-    <arg name="control_error_topic" default="/$(arg robot_name)/ctrl/control_error" />
-
 
     <!-- Motion Planning Launch-->
     <arg name="waypoint_topic_arg" default="/waypoint_topic"/>
@@ -50,10 +48,11 @@
     <!-- <node pkg="tf" type="static_transform_publisher" name="sam_static_tfm_ds"
         args="0.0 20.0 -1.5 0.0 0.0 0.0 map docking_station/base_link 20"/> -->
 
-    <node name="p_controller_external_ref_depth" pkg="visual_feedback" type="p_controller_external_ref_depth.py"
+    <node name="WaypointFollowingController" pkg="visual_feedback" type="WaypointFollowingController.py"
         output="screen" ns="$(arg robot_name)/ctrl">
 
         <param name="loop_freq" value="$(arg loop_freq)"/>
+        <param name="verbose" value="$(arg verbose_arg)"/>
 
         <param name="ref_pose_topic" value="$(arg ref_pose_topic)" />
 
@@ -62,7 +61,6 @@
         <param name="pitch_topic" value="$(arg pitch_topic)" />
         <param name="state_estimation_topic" value="$(arg state_estimation_topic)" />
         <param name="vbs_topic" value="$(arg vbs_topic)" />
-        <param name="control_error_topic" value="$(arg control_error_topic)" />
     </node>
 
 </launch>

@@ -159,7 +159,7 @@ include_directories(
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
-  src/dockingStation.py src/p_controller_external_ref_depth.py
+  src/dockingStation.py src/WaypointFollowingController.py
   src/tf_to_pose.py src/tf_to_waypoint.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
