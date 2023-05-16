@@ -80,8 +80,8 @@ class WaypointFollowingController(object):
 
         # Topics for feedback and actuators
         # state_feedback_topic = rospy.get_param("~state_feedback_topic", "/sam/dr/odom")
-        press_topic = rospy.get_param("~press_topic", "/sam/core/depth20_pressure")      # in NED
-        pitch_topic = rospy.get_param("~pitch_topic", "/sam/sbg/ekf_euler")
+        depth_topic = rospy.get_param("~depth_topic", "/sam/dr/depth")      # in NED
+        pitch_topic = rospy.get_param("~pitch_topic", "/sam/dr/pitch")
 
         vbs_topic = rospy.get_param("~vbs_topic", "/sam/core/vbs_cmd")
         lcg_topic = rospy.get_param("~lcg_topic", "/sam/core/lcg_cmd")
@@ -94,7 +94,8 @@ class WaypointFollowingController(object):
 
         # Subscribers to state feedback, setpoints and enable flags
         # rospy.Subscriber(state_feedback_topic, Odometry, self.feedbackCallback)
-        # rospy.Subscriber(depth_topic, Float64, self.depthCallback)
+        rospy.Subscriber(depth_topic, Float64, self.depthCallback)
+        rospy.Subscriber(pitch_topic, Float64, self.pitchCallback)
         rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.waypointCallback)
         rospy.Subscriber(state_estimate_topic, PoseWithCovarianceStamped, self.estimCallback)
 
@@ -139,7 +140,8 @@ class WaypointFollowingController(object):
 
     def pitchCallback(self, pitch):
         # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
-        self.current_pitch = -pitch.angle.y
+        # print("Pitch CB")
+        self.current_pitch = pitch.data
         # print(pitch)
 
     def estimCallback(self, estim):
@@ -147,18 +149,6 @@ class WaypointFollowingController(object):
         self.stateEstim = self.getEulerFromQuaternion(estim.pose)
         self.stateEstim[2] = self.current_depth
         self.stateEstim[4] = self.current_pitch
-
-    def pascal_pressure_to_depth(self, pressure):
-		return 10.*((pressure / 100000.) - 1.) # 117000 -> 1.7
-
-    def depthCB(self, press_msg):
-        # # depth_abs is positive, must be manually negated
-        depth_abs = self.pascal_pressure_to_depth(press_msg.fluid_pressure)
-        # rospy.loginfo("Depth abs %s", depth_abs)
-        # rospy.loginfo("Fluid press %s", press_msg.fluid_pressure)
-
-        if press_msg.fluid_pressure > 90000. and press_msg.fluid_pressure < 500000.:
-            self.current_depth = depth_abs # = [0., 0., 2.]
 
     def waypointCallback(self,estimFB):
         # Get way point in map frame
@@ -289,12 +279,12 @@ class WaypointFollowingController(object):
         self.deriv = (self.err - self.errPrev) * (self.loop_freq)
 
         ## SIM CONTROLLER
-        u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
-        u[4] = -(Kp[4]*self.err[4] + self.lcgNeutral - Ki[4]*self.integral[4] - Kaw[4]*self.antiWindupDifferenceInt[4])   # PI control lcg
+        # u[3] = (Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
+        # u[4] = -(Kp[4]*self.err[4] + self.lcgNeutral - Ki[4]*self.integral[4] - Kaw[4]*self.antiWindupDifferenceInt[4])   # PI control lcg
 
         ## TANK CONTROLLER
-        # u[3] = (Kp[3]*self.err[2] + self.vbsNeutral + Ki[3]*self.integral[2] + Kaw[3]*self.antiWindupDifferenceInt[3])   # PI control vbs
-        # u[4] = (Kp[4]*self.err[4] + self.lcgNeutral + Kd[4]*self.deriv[4])   # PD control lcg
+        u[3] = (Kp[3]*self.err[2] + self.vbsNeutral + Ki[3]*self.integral[2] + Kaw[3]*self.antiWindupDifferenceInt[3])   # PI control vbs
+        u[4] = (Kp[4]*self.err[4] + self.lcgNeutral + Kd[4]*self.deriv[4])   # PD control lcg
 
         return u
 

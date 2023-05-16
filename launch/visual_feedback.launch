@@ -8,8 +8,8 @@
 
     <!-- topics, note the root! -->
     <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" />
-    <arg name="press_topic" default="/$(arg robot_name)/core/depth20_pressure" />
-    <arg name="pitch_topic" default="/$(arg robot_name)/sbg/ekf_euler" />
+    <arg name="depth_topic" default="/$(arg robot_name)/dr/depth" />
+    <arg name="pitch_topic" default="/$(arg robot_name)/dr/pitch" />
 
     <arg name="state_estimation_topic" default="/$(arg robot_name)/EstimatedPose" />
 
@@ -48,6 +48,15 @@
     <!-- <node pkg="tf" type="static_transform_publisher" name="sam_static_tfm_ds"
         args="0.0 20.0 -1.5 0.0 0.0 0.0 map docking_station/base_link 20"/> -->
 
+    <!-- <include file="smarc_navigation/sam_dead_reckoning/launch/sam_dr.launch" /> -->
+
+    <!--Including tf_convenience topics-->
+    <!-- <node name="odom_listener" pkg="tf_convenience_topics" type="odom_listener" output="screen" >
+        <param name="odom_topic" value="/$(arg robot_name)/dr/odom"/>
+        <param name="topic_from_dvl" value="$/(arg robot_name)/core/dvl"/>
+        <param name="loop_freq" value="10" />
+    </node> -->
+
     <node name="WaypointFollowingController" pkg="visual_feedback" type="WaypointFollowingController.py"
         output="screen" ns="$(arg robot_name)/ctrl">
 
@@ -57,7 +66,7 @@
         <param name="ref_pose_topic" value="$(arg ref_pose_topic)" />
 
         <param name="state_feedback_topic" value="$(arg state_feedback_topic)" />
-        <param name="press_topic" value="$(arg press_topic)" />
+        <param name="depth_topic" value="$(arg depth_topic)" />
         <param name="pitch_topic" value="$(arg pitch_topic)" />
         <param name="state_estimation_topic" value="$(arg state_estimation_topic)" />
         <param name="vbs_topic" value="$(arg vbs_topic)" />
