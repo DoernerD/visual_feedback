@@ -35,8 +35,6 @@ class WaypointFollowingController(object):
         self.current_x = np.array([0., 0., 0.1, 1., 0., 0.])
         self.current_y = np.array([0., 0., 0.1, 1., 0., 0.])
         self.stateEstim= np.array([0., 0., 0.1, 1., 0., 0.])
-        self.current_pitch = 0.
-        self.current_depth = 0.
         self.refX = 0.
         self.refY = 0.
         self.refZ = 0.
@@ -46,7 +44,7 @@ class WaypointFollowingController(object):
         self.ref = np.array([self.refX, self.refY, self.refZ, self.refRoll, self.refPitch, self.refYaw])
 
         # Desired depth and pitch for the experiments (limited to 2D plane)
-        self.depth_desired = 1.8    # in NED, bc. the dr/depth is in NED, ie. it's positive
+        self.depth_desired = 0.    # in NED, bc. the dr/depth is in NED, ie. it's positive
         self.pitch_desired = 0.
 
         self.err = np.array([0., 0., 0., 0., 0., 0.])
@@ -80,9 +78,6 @@ class WaypointFollowingController(object):
 
         # Topics for feedback and actuators
         # state_feedback_topic = rospy.get_param("~state_feedback_topic", "/sam/dr/odom")
-        depth_topic = rospy.get_param("~depth_topic", "/sam/dr/depth")      # in NED
-        pitch_topic = rospy.get_param("~pitch_topic", "/sam/dr/pitch")
-
         vbs_topic = rospy.get_param("~vbs_topic", "/sam/core/vbs_cmd")
         lcg_topic = rospy.get_param("~lcg_topic", "/sam/core/lcg_cmd")
         rpm1_topic = rospy.get_param("~rpm_topic_1", "/sam/core/thruster1_cmd")
@@ -94,8 +89,6 @@ class WaypointFollowingController(object):
 
         # Subscribers to state feedback, setpoints and enable flags
         # rospy.Subscriber(state_feedback_topic, Odometry, self.feedbackCallback)
-        rospy.Subscriber(depth_topic, Float64, self.depthCallback)
-        rospy.Subscriber(pitch_topic, Float64, self.pitchCallback)
         rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.waypointCallback)
         rospy.Subscriber(state_estimate_topic, PoseWithCovarianceStamped, self.estimCallback)
 
@@ -133,23 +126,10 @@ class WaypointFollowingController(object):
     def feedbackCallback(self, odom_fb):
         self.current_x = self.getEulerFromQuaternion(odom_fb.pose)
 
-    def depthCallback(self, depth):
-        # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
-        # print(depth.data)
-        self.current_depth = depth.data
-
-    def pitchCallback(self, pitch):
-        # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
-        # print("Pitch CB")
-        self.current_pitch = pitch.data
-        # print(pitch)
-
     def estimCallback(self, estim):
         # [self.current_x,self.velocities] = self.getStateFeedback(odom_fb)
         self.stateEstim = self.getEulerFromQuaternion(estim.pose)
-        self.stateEstim[2] = self.current_depth
-        self.stateEstim[4] = self.current_pitch
-
+        
     def waypointCallback(self,estimFB):
         # Get way point in map frame
         self.ref = np.zeros([6])
@@ -235,7 +215,7 @@ class WaypointFollowingController(object):
         self.ref[2] = self.depth_desired
         self.ref[4] = self.pitch_desired
 
-        while ((np.abs(self.current_depth - self.ref[2]) <= epsDepth) and (np.abs(self.current_pitch - self.ref[4]) <= epsPitch)):
+        while ((np.abs(self.stateEstim[2] - self.ref[2]) <= epsDepth) and (np.abs(self.stateEstim[4] - self.ref[4]) <= epsPitch)):
             u = self.computeConstVelDepthControlAction()
             return u
  
@@ -345,11 +325,11 @@ class WaypointFollowingController(object):
         # Going forwards and backwards based on the distance to the target
         stopRadius = 0.2
         if self.distanceErr > stopRadius:
-            u[0] = 200
+            u[0] = 0
             u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt - Kaw[1]*self.antiWindupDifferenceInt[1])   # PI control vectoring (horizontal)
 
         elif self.distanceErr < -stopRadius:
-            u[0] = -200
+            u[0] = -0
             self.headingAngleScaled = np.sign(self.headingAngle) * (np.pi - np.abs(self.headingAngle))
             u[1] = -(Kp[1]*self.headingAngleScaled - (Ki[1]*self.headingAngleInt + Kaw[1]*self.antiWindupDifferenceInt[1]))   # PI control vectoring (horizontal)
 
