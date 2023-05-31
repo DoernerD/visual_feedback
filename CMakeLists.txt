@@ -160,7 +160,7 @@ include_directories(
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
   src/dockingStation.py src/WaypointFollowingController.py
-  src/tf_to_pose.py src/tf_to_waypoint.py
+  src/tf_to_pose.py src/tf_to_waypoint.py src/simplePathPlanner.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

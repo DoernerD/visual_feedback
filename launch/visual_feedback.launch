@@ -40,21 +40,6 @@
     <!-- Control Launch-->
     <arg name="ref_pose_topic" default="$(arg waypoint_topic_arg)" />
 
-
-    <!-- Nodes -->
-    <!-- Ground truth for the estimate-->
-    <!-- <node pkg="tf" type="static_transform_publisher" name="sam_static_tfm_ds"
-        args="0.0 20.0 -1.5 0.0 0.0 0.0 map docking_station/base_link 20"/> -->
-
-    <!-- <include file="smarc_navigation/sam_dead_reckoning/launch/sam_dr.launch" /> -->
-
-    <!--Including tf_convenience topics-->
-    <!-- <node name="odom_listener" pkg="tf_convenience_topics" type="odom_listener" output="screen" >
-        <param name="odom_topic" value="/$(arg robot_name)/dr/odom"/>
-        <param name="topic_from_dvl" value="$/(arg robot_name)/core/dvl"/>
-        <param name="loop_freq" value="10" />
-    </node> -->
-
     <node name="WaypointFollowingController" pkg="visual_feedback" type="WaypointFollowingController.py"
         output="screen" ns="$(arg robot_name)/ctrl">
 
