@@ -1,0 +1,34 @@
+<launch>
+
+    <!-- Configurable arguments -->
+    <arg name="robot_name" default="sam"/>
+
+    <arg name="loop_freq" default="20."/>
+    <arg name="verbose_arg" default="True"/>
+
+    <arg name="waypoint_topic_arg" default="/waypoint_topic"/>
+
+
+    <!-- topics, note the root! -->
+    <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" />
+    <arg name="state_estimation_topic" default="/$(arg robot_name)/EstimatedPose" />
+    <arg name="vbs_topic" default="/$(arg robot_name)/core/vbs_cmd" />
+    <arg name="ref_pose_topic" default="$(arg waypoint_topic_arg)" />
+    <arg name="dockingStationEstimationTopicArg" default="EstimatedStationPose"/>
+
+
+    <!-- Nodes -->
+    <node name="SimplePathPlanner" pkg="visual_feedback" type="simplePathPlanner.py"
+        output="screen">
+
+        <param name="loop_freq" value="$(arg loop_freq)"/>
+
+        <param name="waypointTopic" value="$(arg waypoint_topic_arg)" />
+        <param name="dockingStationEstimationTopic" value="$(arg dockingStationEstimationTopicArg)" />
+
+        <param name="state_feedback_topic" value="$(arg state_feedback_topic)" />
+        <param name="stateEstimationTopic" value="$(arg state_estimation_topic)" />
+    </node>
+
+
+</launch>

@@ -27,6 +27,7 @@ class SimplePathPlanner(object):
         # Init
         self.start = np.array([0., 0., np.deg2rad(0)])
         self.goal = np.array([0., 0., np.deg2rad(90)])
+        self.receivedGoal = False
 
         self.eps = 1.
         
@@ -63,24 +64,27 @@ class SimplePathPlanner(object):
 
         # Run
         while not rospy.is_shutdown():
-            # 1. Check if you need to calculate a plan
-            planNeeded = self.requirePlan()
-            # 1.1 Yes: Calculate Plan
-            if planNeeded:
-                print("Planning")
-                self.calculatePathSegments()
-                self.calculateBezierCurve()
-                self.calculatedPath = True
+            if self.receivedGoal:
+                # 1. Check if you need to calculate a plan
+                planNeeded = self.requirePlan()
+                # 1.1 Yes: Calculate Plan
+                if planNeeded:
+                    print("Planning")
+                    self.calculatePathSegments()
+                    self.calculateBezierCurve()
+                    self.calculatedPath = True
 
-                # Plot Path -> saves to file
-                self.plotPath()
-            # 1.2 No: continue
+                    # Plot Path -> saves to file
+                    self.plotPath()
+                # 1.2 No: continue
 
-            # 2. Get current waypoint
-            self.getCurrentWaypoint()
+                # 2. Get current waypoint
+                self.getCurrentWaypoint()
 
-            # 3. Publish current waypoint
-            self.publishCurrentWaypoint()
+                # 3. Publish current waypoint
+                self.publishCurrentWaypoint()
+            else:
+                print("No goal available")
 
             # 4. Sleep
             rate.sleep()
@@ -92,6 +96,7 @@ class SimplePathPlanner(object):
         self.goal[0] = DSPose[0]
         self.goal[1] = DSPose[1]
         self.goal[2] = DSPose[5]
+        self.receivedGoal = True
 
 
     def stateEstimateCallback(self,estim):
@@ -99,6 +104,7 @@ class SimplePathPlanner(object):
         self.start[0] = SAMPose[0]
         self.start[1] = SAMPose[1]
         self.start[2] = SAMPose[5]
+        # print("SAM Pose: x = {}, y = {}, theta = {}".format(*self.start))
 
     def getEulerFromQuaternion(self, pose):
         # Pose is in ENU. The callback extracts the position and Euler angles.
@@ -132,28 +138,59 @@ class SimplePathPlanner(object):
         #           -> give some good lee-way, otherwise there might be a lot of jumping...
         #       - TODO: Too far from current waypoint (How to measure?)
         if not self.calculatedPath:
+            print("No plan yet")
             return True
         
         xDiff = self.goal[0] - self.path["x"][-1]
         yDiff = self.goal[1] - self.path["y"][-1]
         distanceCurrentGoalDSEstimate = np.linalg.norm([xDiff, yDiff])
+        # print("xDiff: {}, yDiff: {}, distance: {}".format(xDiff, yDiff, distanceCurrentGoalDSEstimate))
                 
-        if distanceCurrentGoalDSEstimate > 1.:
-            # print("Distance Goal to DS: {}".format(distanceCurrentGoalDSEstimate))
-            # print("xDiff: {}, xDS Estimate: {}, xGoal: {}".format(xDiff, self.goal[0], self.path["x"][-1]))
-            # print("yDiff: {}, yDS Estimate: {}, yGoal: {}".format(yDiff, self.goal[1], self.path["y"][-1]))
+        if distanceCurrentGoalDSEstimate > 2.:
+            print("Goal moved")
             return True
         
         return False
 
 
     def calculatePathSegments(self):
-        self.controlPoints["x"]= np.array([self.start[0], self.goal[0], self.goal[0]])
-        self.controlPoints["y"] = np.array([self.start[1], self.start[1], self.goal[1] - 1])
+        # Calculate Bezier Control Point (second array entry)
+        # Combining laws of sin and cosine to caluclate the desired waypoint
+        # TODO: consider the angles. Now SAM is left of the docking station, does it work when he's right of it, too?
 
-        yCalc = self.start[1] + (self.goal[0] - self.start[0]) * np.tan(self.start[2])
+        xAxisDS, yAxisDS = self.calculateOrientationAxes(self.goal[2], 1)
+        target = np.array([self.goal[0] + xAxisDS[0], self.goal[1] + xAxisDS[1]])
 
-        self.controlPoints["y"][1] = yCalc
+        phiSAM = abs(self.start[2])
+        phiDS = abs(self.goal[2])
+        xDiff = target[0] - self.start[0]
+        yDiff = target[1] - self.start[1]
+        distanceSAMDS = np.linalg.norm([xDiff,yDiff])
+
+        phiB = np.arccos(xDiff/distanceSAMDS) - phiSAM
+        phiA = np.pi - phiB - phiSAM - phiDS
+        phiC = np.pi - phiB - phiA
+
+        print("phiSAM: {}, phiB: {}".format(self.start[2], phiB))
+
+        a = distanceSAMDS * (np.sin(phiA)/np.sin(phiC))
+
+        xCalc = a * np.cos(phiSAM)
+        yCalc = a * np.sin(phiSAM)
+
+
+
+        self.controlPoints["x"]= np.array([self.start[0], 
+                                           self.start[0] + xCalc, 
+                                           target[0]])
+        self.controlPoints["y"] = np.array([self.start[1], 
+                                            self.start[1] + yCalc, 
+                                            target[1]])
+
+        # For rectangular triangles
+        # yCalc = self.start[1] + (self.goal[0] - self.start[0]) * np.tan(self.start[2])
+
+        # self.controlPoints["y"][1] = yCalc
 
 
     def calculateBezierCurve(self):
@@ -206,13 +243,29 @@ class SimplePathPlanner(object):
 
     def plotPath(self):
         fig, ax = plt.subplots()
+        plt.gca().set_aspect('equal')
+        # plt.xlim(-5,5)
 
+        # Path Planning
         ax.plot(self.goal[0], self.goal[1], 'o', color='red', label='DS')
         ax.plot(self.controlPoints["x"], self.controlPoints["y"], label='path')
         ax.plot(self.controlPoints["x"][0] ,self.controlPoints["y"][0], 's', color='C2', markersize=10, label='start')
         ax.plot(self.controlPoints["x"][1] ,self.controlPoints["y"][1], 'o', color='C2', markersize=10)
         ax.plot(self.controlPoints["x"][-1] ,self.controlPoints["y"][-1], '*', color='C2', markersize=10, label='end')
         ax.plot(self.path["x"], self.path["y"], 'x')
+
+
+        # Coordinate visualization
+        originDS = [self.goal[0], self.goal[1]]
+        xAxisDS, yAxisDS = self.calculateOrientationAxes(self.goal[2], 0.5)
+        
+        originSAM = [self.start[0], self.start[1]]
+        xAxisSAM, yAxisSAM = self.calculateOrientationAxes(self.start[2], 0.5)
+
+        plt.arrow(*originDS, *xAxisDS, width=0.01, color='r')
+        plt.arrow(*originDS, *yAxisDS, width=0.01, color='g')
+        plt.arrow(*originSAM, *xAxisSAM, width=0.01, color='r')
+        plt.arrow(*originSAM, *yAxisSAM, width=0.01, color='g')
 
         ax.set_xlabel('x')
         ax.set_ylabel('y')
@@ -221,6 +274,21 @@ class SimplePathPlanner(object):
 
         home_dir = os.path.expanduser('~')  
         plt.savefig(home_dir + '/catkin_ws/src/visual_feedback/fig/bezierPath.png', dpi=300)
+
+
+    def calculateOrientationAxes(self, theta, axisLen):
+        xAxisDS = [axisLen, 0]
+        yAxisDS = [0, axisLen]
+        rotation = np.array([
+            [np.cos(theta), -np.sin(theta)],
+            [np.sin(theta), np.cos(theta)]
+            ])
+        
+        xAxisDSPrime = rotation.dot(xAxisDS)
+        yAxisDSPrime = rotation.dot(yAxisDS)
+
+        return xAxisDSPrime, yAxisDSPrime
+    
     #endregion
 
 if __name__ == "__main__":
