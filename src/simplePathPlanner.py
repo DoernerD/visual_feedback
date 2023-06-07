@@ -45,15 +45,23 @@ class SimplePathPlanner(object):
         self.controlPoints["y"] = np.zeros(self.lenControlPoints)
         self.controlPoints["theta"] = np.zeros(self.lenControlPoints)
 
+        self.controlPointsMap = {}
+        self.controlPointsMap["x"] = np.zeros(self.lenControlPoints)
+        self.controlPointsMap["y"] = np.zeros(self.lenControlPoints)
+        self.controlPointsMap["theta"] = np.zeros(self.lenControlPoints)
+
         self.path = {}
         self.path["x"] = []
         self.path["y"] = []
+
+        self.pathMap = {}
+        self.pathMap["x"] = np.zeros(self.lenControlPoints)
+        self.pathMap["y"] = np.zeros(self.lenControlPoints)
 
         self.calculatedPath = False
         self.currentIndex = 0
 
         self.currentWaypoint = [0., 0.]
-
 
         # Topics
         dockingStationEstimateTopic = rospy.get_param("~dockingStationEstimationTopic")
@@ -71,8 +79,6 @@ class SimplePathPlanner(object):
         self.listener = tf.TransformListener()
         self.base_frame = 'sam/base_link'
 
-
-
         # Run
         while not rospy.is_shutdown():
             if self.receivedGoal:
@@ -81,14 +87,14 @@ class SimplePathPlanner(object):
                 # 1.1 Yes: Calculate Plan
                 if planNeeded:
                     print("Planning")
-                    if self.calculatePathSegments():
+                    if self.inFeasibleRegion():
+                        self.calculatePathSegments()
                         self.calculateBezierCurve()
                         self.calculatedPath = True
 
                         # Plot Path -> saves to file
                         self.plotPath()
                         self.plotTFSamBase()
-
                     else:
                         self.plotPosition()
                 # 1.2 No: continue
@@ -128,11 +134,9 @@ class SimplePathPlanner(object):
         targetMap.pose.pose.orientation.z = DSEstim.pose.pose.orientation.z
         targetMap.pose.pose.orientation.w = DSEstim.pose.pose.orientation.w
                      
-
         self.goalBase = self.tf2SamBase(DSEstim)
         self.targetBase = self.tf2SamBase(targetMap)
         
-
         self.receivedGoal = True
 
     def tf2SamBase(self,poseArg):
@@ -168,12 +172,37 @@ class SimplePathPlanner(object):
         return poseBase
 
 
+    def tf2Map(self, poseBase):
+        poseMap = PoseStamped()
+
+        # Transform into map
+        tmpPose = PoseStamped()
+        tmpPose.header.frame_id = poseBase.header.frame_id
+        tmpPose.header.stamp = rospy.Time(0)
+        tmpPose.pose.position.x = poseBase.pose.pose.position.x
+        tmpPose.pose.position.y = poseBase.pose.pose.position.y
+        tmpPose.pose.position.z = poseBase.pose.pose.position.z
+        tmpPose.pose.orientation.x = poseBase.pose.pose.orientation.x
+        tmpPose.pose.orientation.y = poseBase.pose.pose.orientation.y
+        tmpPose.pose.orientation.z = poseBase.pose.pose.orientation.z
+        tmpPose.pose.orientation.w = poseBase.pose.pose.orientation.w
+
+        try:
+            poseMap = self.listener.transformPose('map', tmpPose)
+
+        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            rospy.logwarn("Transform to base frame not available yet")
+            pass
+
+        return poseMap
+
+
     def stateEstimateCallback(self,estim):
         SAMPose = self.getEulerFromQuaternion(estim.pose)
         self.start[0] = SAMPose[0]
         self.start[1] = SAMPose[1]
         self.start[2] = SAMPose[5]
-        # print("SAM Pose: x = {}, y = {}, theta = {}".format(*self.start))
+
 
     def getEulerFromQuaternion(self, pose):
         # Pose is in ENU. The callback extracts the position and Euler angles.
@@ -210,117 +239,47 @@ class SimplePathPlanner(object):
             print("No plan yet")
             return True
         
-        xDiff = self.goal[0] - self.path["x"][-1]
-        yDiff = self.goal[1] - self.path["y"][-1]
+        xDiff = self.targetBase[0] - self.path["x"][-1]
+        yDiff = self.targetBase[1] - self.path["y"][-1]
         distanceCurrentGoalDSEstimate = np.linalg.norm([xDiff, yDiff])
                 
-        if distanceCurrentGoalDSEstimate > 2.:
+        if distanceCurrentGoalDSEstimate > 0.5:
             print("Goal moved")
+            return True
+        
+        thetaDiff = self.goalBase[2] - self.controlPoints["theta"][-1]
+        if abs(thetaDiff) > 0.175/2: # 5deg change
+            print("Goal rotated")
             return True
         
         return False
 
 
-
-        
-
-    def calculatePathSegments(self):
-        # Calculate Bezier Control Point (second array entry)
-        # Combining laws of sin and cosine to caluclate the desired waypoint
-        # TODO: consider the angles. Now SAM is left of the docking station, does it work when he's right of it, too?
-
-        if self.start[2] < 0:
-            rospy.logwarn("Not facing docking station.")
+    def inFeasibleRegion(self):
+        if self.goalBase[0] < 0:
+            rospy.logwarn("Not facing docking station, xDS: {}".format(self.goalBase[0]))
             return False
-        
-        # xAxisDS, yAxisDS = self.calculateOrientationAxes(self.goal[2], 1)
-        # target = np.array([self.goal[0] + xAxisDS[0], self.goal[1] + xAxisDS[1]])
-        # target = np.array([self.goal[0], self.goal[1]])
-        target = self.target
 
-        phiSAM = abs(self.start[2])
-        phiDS = abs(self.goal[2])
-        xDiff = abs(target[0] - self.start[0])
-        yDiff = abs(target[1] - self.start[1])
-        distanceSAMDS = np.linalg.norm([xDiff,yDiff])
+        if abs(self.goalBase[2]) < np.pi/2:
+            rospy.logwarn("Wrong angle, phiDS: {}".format(abs(self.goalBase[2])))
+            return False
 
-        phiCalc = np.arccos(xDiff/distanceSAMDS)
-
-        if phiSAM < phiCalc:    
-            phiB = abs(phiCalc - phiSAM)
-            phiA = abs(np.pi - phiCalc - phiDS)
-            phiC = np.pi - phiB - phiA
-
-            a = distanceSAMDS * (np.sin(phiA)/np.sin(phiC))     # Note, this is not a right angled triangle anymore
-            b = distanceSAMDS * (np.sin(phiB)/np.sin(phiC))
-
-            xCalc = a * np.cos(phiSAM)
-            yCalc = a * np.sin(phiSAM)    
-
-            # Sanity check the waypoints
-            if abs(a) > abs(distanceSAMDS) or abs(b) > abs(distanceSAMDS):
-                rospy.logwarn("Can't generate path plan (lengths)")
-                return False
-            
-            # if abs(phiA) + abs(phiB) + abs(phiC) > np.pi:
-            #     rospy.logwarn("Can't generate path plan (angles) {}".format(abs(phiA) + abs(phiB) + abs(phiC)))
-            #     return False
-
-            self.controlPoints["x"]= np.array([self.start[0], 
-                                        self.start[0] + xCalc, 
-                                           target[0]])
-            self.controlPoints["y"] = np.array([self.start[1], 
-                                            self.start[1] + yCalc, 
-                                            target[1]])
-        else: 
-            phiB = abs(phiCalc - (np.pi - phiSAM))
-            phiA = abs(phiDS + (phiSAM - phiB) - np.pi)
-            phiC = np.pi - phiB - phiA
-
-            a = distanceSAMDS * (np.sin(phiA)/np.sin(phiC))     # Note, this is not a right angled triangle anymore
-            b = distanceSAMDS * (np.sin(phiB)/np.sin(phiC))
-
-            xCalc = a * np.cos(phiSAM)
-            yCalc = a * np.sin(phiSAM)
-
-            
-
-            # Sanity check the waypoints
-            if abs(a) > abs(distanceSAMDS) or abs(b) > abs(distanceSAMDS):
-                rospy.logwarn("Can't generate path plan (lengths)")
-                return False
-
-            self.controlPoints["x"]= np.array([self.start[0], 
-                                        self.start[0] - xCalc, 
-                                           target[0]])
-            self.controlPoints["y"] = np.array([self.start[1], 
-                                            self.start[1] - yCalc, 
-                                            target[1]])
-        
-        A = np.array([self.controlPoints["x"][0], self.controlPoints["y"][0]])
-        B = np.array([self.controlPoints["x"][1], self.controlPoints["y"][1]])
-        C = np.array([self.controlPoints["x"][2], self.controlPoints["y"][2]])
-
-        AB = np.linalg.norm(A-B)
-        AC = np.linalg.norm(A-C)
-        BC = np.linalg.norm(B-C)
-        
-        print("a: {}, b: {}, c: {}".format(a, b, distanceSAMDS))
-        print("AB: {}, AC: {}, BC: {}".format(AB, AC, BC))
-        # print("Triangle sum: {}".format(np.rad2deg(abs(phiA) + abs(phiB) + abs(phiC))))
-        # print("xCalc: {}, yCalc: {}".format(xCalc, yCalc))
-        print("phiA: {}, phiB: {}, phiC: {}".format(np.rad2deg(phiA), np.rad2deg(phiB), np.rad2deg(phiC)))
-        print("phiSAM: {}, phiDS: {}".format(np.rad2deg(phiSAM), np.rad2deg(phiDS)))
-        print("start: {}, middle: {}, end: {}".format([self.controlPoints["x"][0], self.controlPoints["y"][0]],
-                                                      [self.controlPoints["x"][1], self.controlPoints["y"][1]],
-                                                      [self.controlPoints["x"][2], self.controlPoints["y"][2]]))
-        
         return True
 
-        # For rectangular triangles
-        # yCalc = self.start[1] + (self.goal[0] - self.start[0]) * np.tan(self.start[2])
-
-        # self.controlPoints["y"][1] = yCalc
+        
+    def calculatePathSegments(self):
+        # Calculate Bezier Control Point (second array entry)
+        phiPrime = self.goalBase[2] - np.pi/2   # 90deg offset for the rotation. sign doesn't matter here, bc. tan is periodic with pi.
+        xPrime = self.targetBase[1] * np.tan(phiPrime)
+        self.controlPoints["x"]= np.array([0, self.targetBase[0] + xPrime, self.targetBase[0]])
+        self.controlPoints["y"] = np.array([0, 0,  self.targetBase[1]])
+        self.controlPoints["theta"] = np.array([0., 0., self.goalBase[2]])
+        
+        # Transform into map frame
+        for pt in range(len(self.controlPoints["x"])):
+            controlpointPose = self.waypoint2pose([self.controlPoints["x"][pt], self.controlPoints["y"][pt]])
+            controlpointMap = self.tf2Map(controlpointPose)
+            self.controlPointsMap["x"][pt], self.controlPointsMap["y"][pt] = controlpointMap.pose.position.x, controlpointMap.pose.position.y
 
 
     def calculateBezierCurve(self):
@@ -329,9 +288,15 @@ class SimplePathPlanner(object):
                     + 2 * t * (1 - t) * np.array([self.controlPoints["x"][1],self.controlPoints["y"][1]]) \
                     + t**2 * np.array([self.controlPoints["x"][2],self.controlPoints["y"][2]])
         
-        # Calculation Bezier curve
+        # Calculation Bezier curve in sam/base_link
         points = np.array([P(t) for t in np.linspace(0, 1, 3)])
-        self.path["x"], self.path["y"] = points[:,0], points[:,1]
+        self.path["x"], self.path["y"] = points[:,0], points[:,1]        
+
+        # Transform into map frame
+        for pt in range(len(self.path["x"])):
+            waypointPose = self.waypoint2pose([self.path["x"][pt], self.path["y"][pt]])
+            waypointMap = self.tf2Map(waypointPose)
+            self.pathMap["x"][pt], self.pathMap["y"][pt] = waypointMap.pose.position.x, waypointMap.pose.position.y
 
 
     def getCurrentWaypoint(self):
@@ -341,7 +306,6 @@ class SimplePathPlanner(object):
             if self.currentIndex < len(self.path["x"])-1:
                 self.currentIndex += 1
         self.currentWaypoint = [self.path["x"][self.currentIndex], self.path["y"][self.currentIndex]]
-        # print("Current Index: ", self.currentIndex)
 
 
     def calculateDistanceToWaypoint(self):
@@ -353,16 +317,20 @@ class SimplePathPlanner(object):
 
     def publishCurrentWaypoint(self):        
         try:
+            currentWaypointBase = self.waypoint2pose(self.currentWaypoint)
+            tmpWaypoint = self.tf2Map(currentWaypointBase)
+
+            # We always publish PoseWithCovarianceStamped, but tf.listener only can transform PoseStamped. 
             publishWaypoint = PoseWithCovarianceStamped()
             publishWaypoint.header.frame_id = 'map'
             publishWaypoint.header.stamp = rospy.Time(0)
-            publishWaypoint.pose.pose.position.x = self.currentWaypoint[0]
-            publishWaypoint.pose.pose.position.y = self.currentWaypoint[1]
-            publishWaypoint.pose.pose.position.z = 0
-            publishWaypoint.pose.pose.orientation.w = 0
-            publishWaypoint.pose.pose.orientation.x = 0
-            publishWaypoint.pose.pose.orientation.y = 0
-            publishWaypoint.pose.pose.orientation.z = 0
+            publishWaypoint.pose.pose.position.x = tmpWaypoint.pose.position.x
+            publishWaypoint.pose.pose.position.y = tmpWaypoint.pose.position.y
+            publishWaypoint.pose.pose.position.z = tmpWaypoint.pose.position.z
+            publishWaypoint.pose.pose.orientation.x = tmpWaypoint.pose.orientation.x
+            publishWaypoint.pose.pose.orientation.y = tmpWaypoint.pose.orientation.y
+            publishWaypoint.pose.pose.orientation.z = tmpWaypoint.pose.orientation.z
+            publishWaypoint.pose.pose.orientation.w = tmpWaypoint.pose.orientation.w
 
             self.waypointPub.publish(publishWaypoint)
             
@@ -370,18 +338,33 @@ class SimplePathPlanner(object):
             rospy.logwarn("map frame not available yet")
             pass
 
+    
+    def waypoint2pose(self, waypoint):
+        poseWaypoint = PoseWithCovarianceStamped()
+        poseWaypoint.header.frame_id = self.base_frame
+        poseWaypoint.header.stamp = rospy.Time(0)
+        poseWaypoint.pose.pose.position.x = waypoint[0]
+        poseWaypoint.pose.pose.position.y = waypoint[1]
+        poseWaypoint.pose.pose.position.z = 0
+        poseWaypoint.pose.pose.orientation.w = 0
+        poseWaypoint.pose.pose.orientation.x = 0
+        poseWaypoint.pose.pose.orientation.y = 0
+        poseWaypoint.pose.pose.orientation.z = 0
 
+        return poseWaypoint
+
+    #region Plotting
     def plotPath(self):
         fig, ax = plt.subplots()
         plt.gca().set_aspect('equal')
 
         # Path Planning
         ax.plot(self.goal[0], self.goal[1], 'o', color='red', label='DS')
-        ax.plot(self.controlPoints["x"], self.controlPoints["y"], label='path')
-        ax.plot(self.controlPoints["x"][0] ,self.controlPoints["y"][0], 's', color='C2', markersize=10, label='start')
-        ax.plot(self.controlPoints["x"][1] ,self.controlPoints["y"][1], 'o', color='C2', markersize=10)
-        ax.plot(self.controlPoints["x"][-1] ,self.controlPoints["y"][-1], '*', color='C2', markersize=10, label='end')
-        ax.plot(self.path["x"], self.path["y"], 'x')
+        ax.plot(self.controlPointsMap["x"], self.controlPointsMap["y"], label='path')
+        ax.plot(self.controlPointsMap["x"][0] ,self.controlPointsMap["y"][0], 's', color='C2', markersize=10, label='start')
+        ax.plot(self.controlPointsMap["x"][1] ,self.controlPointsMap["y"][1], 'o', color='C2', markersize=10)
+        ax.plot(self.controlPointsMap["x"][-1] ,self.controlPointsMap["y"][-1], '*', color='C2', markersize=10, label='end')
+        ax.plot(self.pathMap["x"], self.pathMap["y"], 'x')
 
 
         # Coordinate visualization
@@ -391,20 +374,24 @@ class SimplePathPlanner(object):
         originSAM = [self.start[0], self.start[1]]
         xAxisSAM, yAxisSAM = self.calculateOrientationAxes(self.start[2], 0.5)
 
+        # DS Axes
         plt.arrow(*originDS, *xAxisDS, width=0.01, color='r')
         plt.arrow(*originDS, *yAxisDS, width=0.01, color='g')
         plt.arrow(*self.target, *xAxisDS, width=0.01, color='r')
         plt.arrow(*self.target, *yAxisDS, width=0.01, color='g')
+
+        # SAM Coordinate axes
+        
         plt.arrow(*originSAM, *xAxisSAM, width=0.01, color='r')
         plt.arrow(*originSAM, *yAxisSAM, width=0.01, color='g')
 
         ax.set_xlabel('x')
         ax.set_ylabel('y')
-        ax.set_title('simple path')
+        ax.set_title('map')
         ax.legend()
 
         home_dir = os.path.expanduser('~')  
-        plt.savefig(home_dir + '/catkin_ws/src/visual_feedback/fig/bezierPath.png', dpi=300)
+        plt.savefig(home_dir + '/catkin_ws/src/visual_feedback/fig/bezierPathMap.png', dpi=300)
 
 
     def plotPosition(self):
@@ -441,6 +428,14 @@ class SimplePathPlanner(object):
         fig, ax = plt.subplots()
         plt.gca().set_aspect('equal')
 
+        # Path segments
+        ax.plot(self.controlPoints["x"], self.controlPoints["y"], label='path')
+        ax.plot(self.controlPoints["x"][0] ,self.controlPoints["y"][0], 's', color='C2', markersize=10, label='start')
+        ax.plot(self.controlPoints["x"][1] ,self.controlPoints["y"][1], 'o', color='C2', markersize=10)
+        ax.plot(self.controlPoints["x"][-1] ,self.controlPoints["y"][-1], '*', color='C2', markersize=10, label='end')
+        ax.plot(self.path["x"], self.path["y"], 'x')
+
+        # Targets
         ax.plot(self.goalBase[0], self.goalBase[1], 'o', color='red', label='DS')
         ax.plot(self.targetBase[0], self.targetBase[1], 'o', color='green', label='target')
         ax.plot(0, 0, 'o', color='b', label='SAM')
@@ -458,6 +453,9 @@ class SimplePathPlanner(object):
         plt.arrow(*originDS, *yAxisDS, width=0.01, color='g')
         plt.arrow(*originTargetBase, *xAxisDS, width=0.01, color='r')
         plt.arrow(*originTargetBase, *yAxisDS, width=0.01, color='g')
+
+        plt.arrow(*originTargetBase, *xAxisSAM, width=0.01, color='r', alpha=0.5)
+        plt.arrow(*originTargetBase, *yAxisSAM, width=0.01, color='g', alpha=0.5)
         plt.arrow(*originSAM, *xAxisSAM, width=0.01, color='r')
         plt.arrow(*originSAM, *yAxisSAM, width=0.01, color='g')
 
@@ -466,7 +464,9 @@ class SimplePathPlanner(object):
         ax.set_title('sam/base_link')
         ax.legend()
 
-        plt.show()
+        home_dir = os.path.expanduser('~')  
+        plt.savefig(home_dir + '/catkin_ws/src/visual_feedback/fig/bezierPathSAMFrame.png', dpi=300)
+
 
     def calculateOrientationAxes(self, theta, axisLen):
         xAxisDS = [axisLen, 0]
@@ -480,7 +480,7 @@ class SimplePathPlanner(object):
         yAxisDSPrime = rotation.dot(yAxisDS)
 
         return xAxisDSPrime, yAxisDSPrime
-    
+    #endregion
     #endregion
 
 if __name__ == "__main__":
