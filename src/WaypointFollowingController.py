@@ -117,7 +117,8 @@ class WaypointFollowingController(object):
 
             self.computeAntiWindup(u)
 
-            self.publishControlAction(self.uLimited)
+            # self.publishControlAction(self.uLimited)
+            self.publishControlAction(self.uNeutral)
 
             if verbose:
                 self.printStates(u)

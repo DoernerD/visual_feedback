@@ -2,7 +2,7 @@
 
     <include file="$(find ekf_slam)/launch/ekf_slam_6d.launch" />
 
-    <include file="$(find visual_feedback)/launch/visual_feedback.launch" />
+    <include file="$(find visual_feedback)/launch/visual_feedback_simple_planner.launch" />
 
 </launch>
 
