@@ -166,7 +166,7 @@ class SimplePathPlanner(object):
                                          goalSamBaseLink.pose.orientation.w])
             poseBase[2] = rpy[2]
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            rospy.logwarn("Transform to base frame not available yet")
+            rospy.logwarn("[SPP]: Transform to base frame not available yet")
             pass
 
         return poseBase

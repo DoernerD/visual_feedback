@@ -61,7 +61,7 @@ class WaypointFollowingController(object):
         # Neutral actuator inputs
         self.vbsNeutral = 50.
         self.lcgNeutral = 70.
-        self.thrusterNeutral = 0.
+        self.thrusterNeutral = 0
         self.vecHorizontalNeutral = 0.
         self.vecVerticalNeutral = 0.
         self.current_depth = 0.
@@ -117,7 +117,8 @@ class WaypointFollowingController(object):
 
             self.computeAntiWindup(u)
 
-            self.publishControlAction(self.uLimited)
+            # self.publishControlAction(self.uLimited)
+            self.publishControlAction(self.uNeutral)
 
             if verbose:
                 self.printStates(u)
@@ -153,7 +154,7 @@ class WaypointFollowingController(object):
             self.ref[1] = goal_point_local.point.y
             self.ref[2] = goal_point_local.point.z
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            rospy.logwarn("Transform to base frame not available yet")
+            rospy.logwarn("[WPF]: Transform to base frame not available yet")
             pass
 
                
@@ -192,8 +193,8 @@ class WaypointFollowingController(object):
         vbs = PercentStamped()
         lcg = PercentStamped()
 
-        thruster1.rpm = u[0]
-        thruster2.rpm = u[0]
+        thruster1.rpm = int(u[0])
+        thruster2.rpm = int(u[0])
         vec.thruster_horizontal_radians = u[1] 
         vec.thruster_vertical_radians = u[2]
         vbs.value = int(u[3])
