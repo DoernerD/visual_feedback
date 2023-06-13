@@ -25,7 +25,7 @@
         <param name="frameTopic" value="/EstimatedStationPose"/>
     </node> -->
 
-    <node name="tf_broadcaster_DS" pkg="visual_feedback" type="tf_broadcaster.py"
+    <node name="fakeTopics" pkg="visual_feedback" type="fakeTopicPublisher.py"
         output="screen">
 
         <param name="frameName" value="EstimatedStationPose"/>

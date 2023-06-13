@@ -1,6 +1,6 @@
 <launch>
 
-    <include file="$(find lolo_perception)/launch/perception.launch" />
+    <!-- <include file="$(find lolo_perception)/launch/perception.launch" /> -->
 
     <include file="$(find ekf_slam)/launch/ekf_slam_6d.launch" />
 

@@ -23,6 +23,7 @@ class SimplePathPlanner(object):
         # External Parameter
         self.loop_freq = rospy.get_param("~loop_freq", 20)
         rate = rospy.Rate(self.loop_freq) 
+        verbose = rospy.get_param("~verbose", True)
 
         # Init
         # map frame
@@ -77,7 +78,7 @@ class SimplePathPlanner(object):
 
         # TF tree listener
         self.listener = tf.TransformListener()
-        self.base_frame = 'sam/base_link'
+        self.base_frame = 'sam/base_link/estimated'
 
         # Run
         while not rospy.is_shutdown():
@@ -95,8 +96,8 @@ class SimplePathPlanner(object):
                         # Plot Path -> saves to file
                         self.plotPath()
                         self.plotTFSamBase()
-                    else:
-                        self.plotPosition()
+                    # else:
+                        # self.plotPosition()
                 # 1.2 No: continue
 
                 if self.calculatedPath:
@@ -107,6 +108,9 @@ class SimplePathPlanner(object):
                     self.publishCurrentWaypoint()
             else:
                 print("No goal available")
+
+            if verbose:
+                self.printStates()
 
             # 4. Sleep
             rate.sleep()
@@ -119,6 +123,7 @@ class SimplePathPlanner(object):
         self.goal[0] = DSPose[0]
         self.goal[1] = DSPose[1]
         self.goal[2] = DSPose[5]
+
 
         xAxisDS, yAxisDS = self.calculateOrientationAxes(self.goal[2], 1)
         self.target = np.array([self.goal[0] + xAxisDS[0], self.goal[1] + xAxisDS[1]])
@@ -204,6 +209,7 @@ class SimplePathPlanner(object):
         self.start[2] = SAMPose[5]
 
 
+
     def getEulerFromQuaternion(self, pose):
         # Pose is in ENU. The callback extracts the position and Euler angles.
         #
@@ -256,6 +262,7 @@ class SimplePathPlanner(object):
 
 
     def inFeasibleRegion(self):
+        return True
         if self.goalBase[0] < 0:
             rospy.logwarn("Not facing docking station, xDS: {}".format(self.goalBase[0]))
             return False
@@ -481,6 +488,11 @@ class SimplePathPlanner(object):
 
         return xAxisDSPrime, yAxisDSPrime
     #endregion
+
+    def printStates(self):
+        print("SAM Pose (map): x = {}, y = {}, phiSAM = {}".format(self.start[0], self.start[1], self.start[2]))
+        print("DS Pose (map): x = {}, y = {}, phiDS = {}".format(self.goal[0], self.goal[1], self.goal[2]))
+
     #endregion
 
 if __name__ == "__main__":
