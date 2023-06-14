@@ -4,8 +4,8 @@
     <arg name="robot_name" default="sam"/>
 
     <arg name="loop_freq" default="20."/>
-    <arg name="verbose_arg" default="False"/>
-    <arg name="planner_verbose_arg" default="True"/>
+    <arg name="verbose_arg" default="True"/>
+    <arg name="planner_verbose_arg" default="False"/>
 
     <arg name="waypoint_topic_arg" default="/waypoint_topic"/>
 

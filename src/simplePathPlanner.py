@@ -125,7 +125,7 @@ class SimplePathPlanner(object):
         self.goal[2] = DSPose[5]
 
 
-        xAxisDS, yAxisDS = self.calculateOrientationAxes(self.goal[2], 1)
+        xAxisDS, yAxisDS = self.calculateOrientationAxes(self.goal[2], -1)
         self.target = np.array([self.goal[0] + xAxisDS[0], self.goal[1] + xAxisDS[1]])
 
         targetMap = PoseWithCovarianceStamped()
@@ -262,7 +262,7 @@ class SimplePathPlanner(object):
 
 
     def inFeasibleRegion(self):
-        return True
+        # return True
         if self.goalBase[0] < 0:
             rospy.logwarn("Not facing docking station, xDS: {}".format(self.goalBase[0]))
             return False

@@ -44,7 +44,7 @@ class WaypointFollowingController(object):
 
         # Desired depth and pitch for the experiments (limited to 2D plane)
         # In simulation depth is negative (ENU), in reality, it's positive (NED)
-        self.depth_desired = 1. 
+        self.depth_desired = 1 
         self.pitch_desired = 0.
 
         self.err = np.array([0., 0., 0., 0., 0., 0.])
@@ -117,8 +117,8 @@ class WaypointFollowingController(object):
 
             self.computeAntiWindup(u)
 
-            # self.publishControlAction(self.uLimited)
-            self.publishControlAction(self.uNeutral)
+            self.publishControlAction(self.uLimited)
+            # self.publishControlAction(self.uNeutral)
 
             if verbose:
                 self.printStates(u)
@@ -237,16 +237,16 @@ class WaypointFollowingController(object):
                         self.lcgNeutral])
 
         ## SIM PARAMETERS
-        Kp = np.array([40, 5, 5, 40, 60])      # P control gain
-        Ki = np.array([0.5, 0.1, 0.1, 0.75, 1.25])       # I control gain
-        Kd = np.array([1., 1., 1., 1., 6.])         # D control gain
-        Kaw = np.array([1., 1., 1., 0., 1.])        # Anti-Windup Gain
+        # Kp = np.array([40, 5, 5, 40, 60])      # P control gain
+        # Ki = np.array([0.5, 0.1, 0.1, 0.75, 1.25])       # I control gain
+        # Kd = np.array([1., 1., 1., 1., 6.])         # D control gain
+        # Kaw = np.array([1., 1., 1., 0., 1.])        # Anti-Windup Gain
 
         ## TANK PARAMETERS
-        # Kp = np.array([40, 5, 5, 40, 60])      # P control gain
-        # Ki = np.array([0., 0., 0., 0., 0.])       # I control gain
-        # Kd = np.array([1., 1., 1., 1., 6.])         # D control gain
-        # Kaw = np.zeros(5)
+        Kp = np.array([40, 5, 5, 40, 60])      # P control gain
+        Ki = np.array([0., 0., 0., 0., 0.])       # I control gain
+        Kd = np.array([1., 1., 1., 1., 6.])         # D control gain
+        Kaw = np.zeros(5)
 
         self.errPrev = self.err
         self.err = self.ref - self.stateEstim
@@ -261,11 +261,11 @@ class WaypointFollowingController(object):
 
         ## SIM CONTROLLER
         # u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
-        u[4] = -(Kp[4]*self.err[4] + self.lcgNeutral - Ki[4]*self.integral[4] - Kaw[4]*self.antiWindupDifferenceInt[4])   # PI control lcg
+        # u[4] = -(Kp[4]*self.err[4] + self.lcgNeutral - Ki[4]*self.integral[4] - Kaw[4]*self.antiWindupDifferenceInt[4])   # PI control lcg
 
         ## TANK CONTROLLER
         u[3] = (Kp[3]*self.err[2] + self.vbsNeutral + Ki[3]*self.integral[2] + Kaw[3]*self.antiWindupDifferenceInt[3])   # PI control vbs
-        # u[4] = (Kp[4]*self.err[4] + self.lcgNeutral + Kd[4]*self.deriv[4])   # PD control lcg
+        u[4] = (Kp[4]*self.err[4] + self.lcgNeutral + Kd[4]*self.deriv[4])   # PD control lcg
 
         return u
 
@@ -279,18 +279,18 @@ class WaypointFollowingController(object):
                         self.lcgNeutral])
 
         # SIM PARAMETERS
-        Kp = np.array([40, 5, 5, 100, 50])        # P control gain
-        Ki = np.array([0.5, 0.1, 0.1, 2, 1])       # I control gain
-        Kd = np.array([1., 1., 1., 1., 1.])         # D control gain
-        Kaw = np.array([1., 1., 1., 4., 1.])        # Anti-Windup Gain
+        # Kp = np.array([40, 5, 5, 100, 50])        # P control gain
+        # Ki = np.array([0.5, 0.1, 0.1, 2, 1])       # I control gain
+        # Kd = np.array([1., 1., 1., 1., 1.])         # D control gain
+        # Kaw = np.array([1., 1., 1., 4., 1.])        # Anti-Windup Gain
         
         # TANK PARAMETERS
-        # Kp = np.array([40, 5, 5, 40, 60])      # P control gain
-        # # Ki = np.array([0.5, 0.1, 0.1, 0.75, 1.25])       # I control gain
-        # Ki = np.array([0., 0., 0., 0., 0.])       # I control gain
-        # Kd = np.array([1., 1., 1., 1., 6.])         # D control gain
-        # #Kaw = np.array([1., 1., 1., 0., 1.])        # Anti-Windup Gain
-        # Kaw = np.zeros(5)
+        Kp = np.array([40, 5, 5, 40, 60])      # P control gain
+        # Ki = np.array([0.5, 0.1, 0.1, 0.75, 1.25])       # I control gain
+        Ki = np.array([0., 0., 0., 0., 0.])       # I control gain
+        Kd = np.array([1., 1., 1., 1., 6.])         # D control gain
+        #Kaw = np.array([1., 1., 1., 0., 1.])        # Anti-Windup Gain
+        Kaw = np.zeros(5)
 
         
         # We need to integrate the anti windup before adding it to the error
@@ -333,32 +333,32 @@ class WaypointFollowingController(object):
             u[0] = 200
             
             # SIM CONTROLLER
-            u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt - Kaw[1]*self.antiWindupDifferenceInt[1])   # PI control vectoring (horizontal)
+            # u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt - Kaw[1]*self.antiWindupDifferenceInt[1])   # PI control vectoring (horizontal)
             
             # TANK CONTROLLER
-            # u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt - Kaw[1]*self.antiWindupDifferenceInt[1])   # PI control vectoring (horizontal)
+            u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt - Kaw[1]*self.antiWindupDifferenceInt[1])   # PI control vectoring (horizontal)
 
         elif self.distanceErr < -stopRadius:
             u[0] = -200
             self.headingAngleScaled = np.sign(self.headingAngle) * (np.pi - np.abs(self.headingAngle))
             
             # SIM CONTROLLER
-            u[1] = -(Kp[1]*self.headingAngleScaled - (Ki[1]*self.headingAngleInt + Kaw[1]*self.antiWindupDifferenceInt[1]))   # PI control vectoring (horizontal)
+            # u[1] = -(Kp[1]*self.headingAngleScaled - (Ki[1]*self.headingAngleInt + Kaw[1]*self.antiWindupDifferenceInt[1]))   # PI control vectoring (horizontal)
             
             # TANK CONTROLLER
-            # u[1] = -(Kp[1]*self.headingAngleScaled - (Ki[1]*self.headingAngleInt + Kaw[1]*self.antiWindupDifferenceInt[1]))   # PI control vectoring (horizontal)
+            u[1] = -(Kp[1]*self.headingAngleScaled - (Ki[1]*self.headingAngleInt + Kaw[1]*self.antiWindupDifferenceInt[1]))   # PI control vectoring (horizontal)
 
         else:
             u[0] = 0
         
         # SIM CONTROLLER
-        u[2] = (Kp[2]*self.err[2] + Ki[2]*self.integral[2] + Kaw[2]*self.antiWindupDifferenceInt[2])   # PI control vectoring (vertical)
+        # u[2] = (Kp[2]*self.err[2] + Ki[2]*self.integral[2] + Kaw[2]*self.antiWindupDifferenceInt[2])   # PI control vectoring (vertical)
         # u[3] = -(Kp[3]*self.err[2] + Ki[3]*self.integral[2])   # PI control vbs
-        u[4] = -(Kp[4]*self.err[4] - Ki[4]*self.integral[4] - Kaw[4]*self.antiWindupDifferenceInt[4])   # PI control lcg
+        # u[4] = -(Kp[4]*self.err[4] - Ki[4]*self.integral[4] - Kaw[4]*self.antiWindupDifferenceInt[4])   # PI control lcg
 
         # TANK CONTROLLER
         u[3] = (Kp[3]*self.err[2] + self.vbsNeutral + Ki[3]*self.integral[2] + Kaw[3]*self.antiWindupDifferenceInt[3])   # PI control vbs
-        # u[4] = (Kp[4]*self.err[4] + self.lcgNeutral + Kd[4]*self.deriv[4])   # PD control lcg
+        u[4] = (Kp[4]*self.err[4] + self.lcgNeutral + Kd[4]*self.deriv[4])   # PD control lcg
 
         return u
     
