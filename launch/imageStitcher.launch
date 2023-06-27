@@ -1,0 +1,30 @@
+<launch>
+
+    <!-- Configurable arguments -->
+    <!-- <arg name="robot_name" default="sam"/>
+
+    <arg name="loop_freq" default="20."/>
+    <arg name="verbose_arg" default="True"/>
+
+    <arg name="waypoint_topic_arg" default="/waypoint_topic"/> -->
+
+
+    <!-- topics, note the root! -->
+    <!-- <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" />
+    <arg name="state_estimation_topic" default="/$(arg robot_name)/EstimatedPose" />
+    <arg name="vbs_topic" default="/$(arg robot_name)/core/vbs_cmd" />
+    <arg name="ref_pose_topic" default="$(arg waypoint_topic_arg)" />
+    <arg name="dockingStationEstimationTopicArg" default="EstimatedStationPose"/> -->
+
+
+    <!-- Nodes -->
+    <node name="imageStitcher" pkg="visual_feedback" type="imageStitcher.py"
+        output="screen">
+
+        <param name="right_image_topic" value="/sam/payload/cam_starboard/image_raw"/>
+        <param name="left_image_topic" value="/sam/payload/cam_port/image_raw"/>
+        <param name="front_image_topic" value="/sam/payload/cam_forward/image_raw"/>
+
+    </node>
+
+</launch>
