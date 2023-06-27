@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # Copyright 2023 David Doerner (ddorner@kth.se)
 
 # Bezier implementation from
@@ -7,7 +7,7 @@
 from __future__ import division, print_function
 
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import os 
 
 import rospy
@@ -70,8 +70,8 @@ class SimplePathPlanner(object):
         waypointTopic = rospy.get_param("~waypointTopic")
 
         # Subscribers
-        rospy.Subscriber(dockingStationEstimateTopic, PoseWithCovarianceStamped, self.dockingStationEstimateCallback)
-        rospy.Subscriber(stateEstimateTopic, PoseWithCovarianceStamped, self.stateEstimateCallback)
+        rospy.Subscriber(dockingStationEstimateTopic, PoseWithCovarianceStamped, self.dockingStationEstimateCallback, queue_size=1)
+        rospy.Subscriber(stateEstimateTopic, PoseWithCovarianceStamped, self.stateEstimateCallback, queue_size=1)
 
         # Publisher
         self.waypointPub = rospy.Publisher(waypointTopic, PoseWithCovarianceStamped, queue_size=1)
@@ -94,8 +94,8 @@ class SimplePathPlanner(object):
                         self.calculatedPath = True
 
                         # Plot Path -> saves to file
-                        self.plotPath()
-                        self.plotTFSamBase()
+                        # self.plotPath()
+                        # self.plotTFSamBase()
                     # else:
                         # self.plotPosition()
                 # 1.2 No: continue
@@ -106,8 +106,8 @@ class SimplePathPlanner(object):
 
                     # 3. Publish current waypoint
                     self.publishCurrentWaypoint()
-            else:
-                print("No goal available")
+            # else:
+                # print("No goal available")
 
             if verbose:
                 self.printStates()
@@ -262,7 +262,7 @@ class SimplePathPlanner(object):
 
 
     def inFeasibleRegion(self):
-        # return True
+        return True
         if self.goalBase[0] < 0:
             rospy.logwarn("Not facing docking station, xDS: {}".format(self.goalBase[0]))
             return False
@@ -374,23 +374,23 @@ class SimplePathPlanner(object):
         ax.plot(self.pathMap["x"], self.pathMap["y"], 'x')
 
 
-        # Coordinate visualization
-        originDS = [self.goal[0], self.goal[1]]
-        xAxisDS, yAxisDS = self.calculateOrientationAxes(self.goal[2], 0.5)
+        # # Coordinate visualization
+        # originDS = [self.goal[0], self.goal[1]]
+        # xAxisDS, yAxisDS = self.calculateOrientationAxes(self.goal[2], 0.5)
         
-        originSAM = [self.start[0], self.start[1]]
-        xAxisSAM, yAxisSAM = self.calculateOrientationAxes(self.start[2], 0.5)
+        # originSAM = [self.start[0], self.start[1]]
+        # xAxisSAM, yAxisSAM = self.calculateOrientationAxes(self.start[2], 0.5)
 
-        # DS Axes
-        plt.arrow(*originDS, *xAxisDS, width=0.01, color='r')
-        plt.arrow(*originDS, *yAxisDS, width=0.01, color='g')
-        plt.arrow(*self.target, *xAxisDS, width=0.01, color='r')
-        plt.arrow(*self.target, *yAxisDS, width=0.01, color='g')
+        # # DS Axes
+        # plt.arrow(*originDS, *xAxisDS, width=0.01, color='r')
+        # plt.arrow(*originDS, *yAxisDS, width=0.01, color='g')
+        # plt.arrow(*self.target, *xAxisDS, width=0.01, color='r')
+        # plt.arrow(*self.target, *yAxisDS, width=0.01, color='g')
 
-        # SAM Coordinate axes
+        # # SAM Coordinate axes
         
-        plt.arrow(*originSAM, *xAxisSAM, width=0.01, color='r')
-        plt.arrow(*originSAM, *yAxisSAM, width=0.01, color='g')
+        # plt.arrow(*originSAM, *xAxisSAM, width=0.01, color='r')
+        # plt.arrow(*originSAM, *yAxisSAM, width=0.01, color='g')
 
         ax.set_xlabel('x')
         ax.set_ylabel('y')
@@ -416,10 +416,10 @@ class SimplePathPlanner(object):
         originSAM = [self.start[0], self.start[1]]
         xAxisSAM, yAxisSAM = self.calculateOrientationAxes(self.start[2], 0.5)
 
-        plt.arrow(*originDS, *xAxisDS, width=0.01, color='r')
-        plt.arrow(*originDS, *yAxisDS, width=0.01, color='g')
-        plt.arrow(*originSAM, *xAxisSAM, width=0.01, color='r')
-        plt.arrow(*originSAM, *yAxisSAM, width=0.01, color='g')
+        # plt.arrow(*originDS, *xAxisDS, width=0.01, color='r')
+        # plt.arrow(*originDS, *yAxisDS, width=0.01, color='g')
+        # plt.arrow(*originSAM, *xAxisSAM, width=0.01, color='r')
+        # plt.arrow(*originSAM, *yAxisSAM, width=0.01, color='g')
 
         ax.set_xlabel('x')
         ax.set_ylabel('y')
@@ -456,15 +456,15 @@ class SimplePathPlanner(object):
         originSAM = [0, 0]
         xAxisSAM, yAxisSAM = self.calculateOrientationAxes(0, 0.5)
         
-        plt.arrow(*originDS, *xAxisDS, width=0.01, color='r')
-        plt.arrow(*originDS, *yAxisDS, width=0.01, color='g')
-        plt.arrow(*originTargetBase, *xAxisDS, width=0.01, color='r')
-        plt.arrow(*originTargetBase, *yAxisDS, width=0.01, color='g')
+        # plt.arrow(*originDS, *xAxisDS, width=0.01, color='r')
+        # plt.arrow(*originDS, *yAxisDS, width=0.01, color='g')
+        # plt.arrow(*originTargetBase, *xAxisDS, width=0.01, color='r')
+        # plt.arrow(*originTargetBase, *yAxisDS, width=0.01, color='g')
 
-        plt.arrow(*originTargetBase, *xAxisSAM, width=0.01, color='r', alpha=0.5)
-        plt.arrow(*originTargetBase, *yAxisSAM, width=0.01, color='g', alpha=0.5)
-        plt.arrow(*originSAM, *xAxisSAM, width=0.01, color='r')
-        plt.arrow(*originSAM, *yAxisSAM, width=0.01, color='g')
+        # plt.arrow(*originTargetBase, *xAxisSAM, width=0.01, color='r', alpha=0.5)
+        # plt.arrow(*originTargetBase, *yAxisSAM, width=0.01, color='g', alpha=0.5)
+        # plt.arrow(*originSAM, *xAxisSAM, width=0.01, color='r')
+        # plt.arrow(*originSAM, *yAxisSAM, width=0.01, color='g')
 
         ax.set_xlabel('x')
         ax.set_ylabel('y')

@@ -6,7 +6,7 @@
 
     <include file="$(find visual_feedback)/launch/visual_feedback_simple_planner.launch" />
 
-    <node pkg="visual_feedback" type="tf_to_waypoint.py" name="tf_to_waypoint" output="screen"/>
+    <!-- <node pkg="visual_feedback" type="tf_to_waypoint.py" name="tf_to_waypoint" output="screen"/> -->
 
 </launch>
 

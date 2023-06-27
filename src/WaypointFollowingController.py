@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # Copyright 2022 David Doerner (ddorner@kth.se)
 
 from __future__ import division, print_function
@@ -44,7 +44,7 @@ class WaypointFollowingController(object):
 
         # Desired depth and pitch for the experiments (limited to 2D plane)
         # In simulation depth is negative (ENU), in reality, it's positive (NED)
-        self.depth_desired = 1 
+        self.depth_desired = 0.4
         self.pitch_desired = 0.
 
         self.err = np.array([0., 0., 0., 0., 0., 0.])
@@ -59,8 +59,8 @@ class WaypointFollowingController(object):
         self.headingAngleInt = 0.
 
         # Neutral actuator inputs
-        self.vbsNeutral = 50.
-        self.lcgNeutral = 70.
+        self.vbsNeutral = 52.
+        self.lcgNeutral = 35.
         self.thrusterNeutral = 0
         self.vecHorizontalNeutral = 0.
         self.vecVerticalNeutral = 0.
@@ -92,8 +92,8 @@ class WaypointFollowingController(object):
 
         # Subscribers to state feedback, setpoints and enable flags
         # rospy.Subscriber(state_feedback_topic, Odometry, self.feedbackCallback)
-        rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.waypointCallback)
-        rospy.Subscriber(state_estimate_topic, PoseWithCovarianceStamped, self.estimCallback)
+        rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.waypointCallback, queue_size=1)
+        rospy.Subscriber(state_estimate_topic, PoseWithCovarianceStamped, self.estimCallback, queue_size=1)
 
         # Publisher to actuators
         self.rpm1Pub = rospy.Publisher(rpm1_topic, ThrusterRPM, queue_size=1)
@@ -330,7 +330,7 @@ class WaypointFollowingController(object):
         # Going forwards and backwards based on the distance to the target
         stopRadius = 0.2
         if self.distanceErr > stopRadius:
-            u[0] = 200
+            u[0] = 100
             
             # SIM CONTROLLER
             # u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt - Kaw[1]*self.antiWindupDifferenceInt[1])   # PI control vectoring (horizontal)
@@ -339,7 +339,7 @@ class WaypointFollowingController(object):
             u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt - Kaw[1]*self.antiWindupDifferenceInt[1])   # PI control vectoring (horizontal)
 
         elif self.distanceErr < -stopRadius:
-            u[0] = -200
+            u[0] = -100
             self.headingAngleScaled = np.sign(self.headingAngle) * (np.pi - np.abs(self.headingAngle))
             
             # SIM CONTROLLER
