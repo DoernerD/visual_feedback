@@ -4,7 +4,7 @@
     <arg name="robot_name" default="sam"/>
 
     <arg name="loop_freq" default="20."/>
-    <arg name="verbose_arg" default="True"/>
+    <arg name="verbose_arg" default="False"/>
 
     <arg name="waypoint_topic_arg" default="/waypoint_topic"/>
 
@@ -14,20 +14,21 @@
     <arg name="state_estimation_topic" default="/$(arg robot_name)/EstimatedPose" />
     <arg name="vbs_topic" default="/$(arg robot_name)/core/vbs_cmd" />
     <arg name="ref_pose_topic" default="$(arg waypoint_topic_arg)" />
-    <arg name="dockingStationEstimationTopicArg" default="EstimatedStationPose"/>
+    <arg name="docking_station_pose_topic_arg" default="EstimatedStationPose"/>
 
 
     <!-- Nodes -->
-    <node name="SimplePathPlanner" pkg="visual_feedback" type="simplePathPlanner.py"
+    <node name="SimplePathPlanner" pkg="visual_feedback" type="planner_node.py"
         output="screen">
 
         <param name="loop_freq" value="$(arg loop_freq)"/>
+        <param name="verbose" value="$(arg verbose_arg)"/>
 
-        <param name="waypointTopic" value="$(arg waypoint_topic_arg)" />
-        <param name="dockingStationEstimationTopic" value="$(arg dockingStationEstimationTopicArg)" />
+        <param name="waypoint_topic" value="$(arg waypoint_topic_arg)" />
+        <param name="docking_station_pose_topic" value="$(arg docking_station_pose_topic_arg)" />
 
         <param name="state_feedback_topic" value="$(arg state_feedback_topic)" />
-        <param name="stateEstimationTopic" value="$(arg state_estimation_topic)" />
+        <param name="state_estimation_topic" value="$(arg state_estimation_topic)" />
     </node>
 
 

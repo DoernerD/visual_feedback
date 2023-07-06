@@ -1,6 +1,12 @@
 #!/usr/bin/python3
-# Copyright 2023 David Doerner (ddorner@kth.se)
+"""
+Simple, bezier based path planner for underwater docking.
 
+Bezier implementation from
+https://towardsdatascience.com/b%C3%A9zier-curve-bfffdadea212
+
+Copyright 2023 David Doerner (ddorner@kth.se)
+"""
 from __future__ import division, print_function
 
 import os
@@ -15,9 +21,11 @@ class SimplePathPlanner(object):
     """
     Bezier curve-based path planner. Returns the current waypoint
     """
-    def __init__(self, name):
-
-        # Init
+    def __init__(self):
+        """
+        Init function
+        TODO: Might be good to externalise the int values?
+        """
         # map frame
         self.start = np.array([0., 0., np.deg2rad(0)])
         self.goal = np.array([0., 0., np.deg2rad(90)])
@@ -56,10 +64,6 @@ class SimplePathPlanner(object):
 
         self.current_waypoint = [0., 0.]
 
-        # TF tree listener
-        # TODO: Put that into the corresponding ROS node
-        # self.listener = tf.TransformListener()
-        # self.base_frame = 'sam/base_link/estimated'
 
     #region functions
     def check_require_plan(self):
@@ -167,20 +171,7 @@ class SimplePathPlanner(object):
         distance = np.linalg.norm([x_diff, y_diff])
         return distance
 
-    # TODO: Put that in the ROS Node
-    # def waypoint2pose(self, waypoint):
-    #     poseWaypoint = PoseWithCovarianceStamped()
-    #     poseWaypoint.header.frame_id = self.base_frame
-    #     poseWaypoint.header.stamp = rospy.Time(0)
-    #     poseWaypoint.pose.pose.position.x = waypoint[0]
-    #     poseWaypoint.pose.pose.position.y = waypoint[1]
-    #     poseWaypoint.pose.pose.position.z = 0
-    #     poseWaypoint.pose.pose.orientation.w = 0
-    #     poseWaypoint.pose.pose.orientation.x = 0
-    #     poseWaypoint.pose.pose.orientation.y = 0
-    #     poseWaypoint.pose.pose.orientation.z = 0
-
-    #     return poseWaypoint
+    
 
     #region Plotting
     def plot_path(self):
@@ -338,7 +329,7 @@ class SimplePathPlanner(object):
 
     #region Outward-facing stuff
     # The callbacks set the corresponding variables here
-    # Then you have the corresponding functions that return whatever and the ROS node can convert 
+    # Then you have the corresponding functions that return whatever and the ROS node can convert
     # it into the proper frame etc.
 
     #endregion
