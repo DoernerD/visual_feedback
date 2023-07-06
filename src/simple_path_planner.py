@@ -215,7 +215,7 @@ class SimplePathPlanner(object):
         plt.arrow(*self.target, *x_axis_ds, width=0.01, color='r')
         plt.arrow(*self.target, *y_axis_ds, width=0.01, color='g')
 
-        # SAM Coordinate axes
+        # # SAM Coordinate axes
         plt.arrow(*origin_sam, *x_axis_sam, width=0.01, color='r')
         plt.arrow(*origin_sam, *y_axis_sam, width=0.01, color='g')
 
@@ -224,7 +224,7 @@ class SimplePathPlanner(object):
         ax.set_title('map')
         ax.legend()
 
-        home_dir = os.path.expanduser('~')  
+        home_dir = os.path.expanduser('~')
         plt.savefig(home_dir + '/catkin_ws/src/visual_feedback/fig/bezierPathMap.png', dpi=300)
 
 
