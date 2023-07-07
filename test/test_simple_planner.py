@@ -39,11 +39,11 @@ class TestSimplePathPlanner(unittest.TestCase):
         self.simple_path_planner.target_base[0] = 1.
         self.simple_path_planner.target_base[1] = 1.
 
-        self.simple_path_planner.path["x"] = np.array([0, 0])
-        self.simple_path_planner.path["y"] = np.array([0, 0])
+        self.simple_path_planner.path_base["x"] = np.array([0, 0])
+        self.simple_path_planner.path_base["y"] = np.array([0, 0])
 
-        self.simple_path_planner.path["x"][-1] = 2.
-        self.simple_path_planner.path["y"][-1] = 2.
+        self.simple_path_planner.path_base["x"][-1] = 2.
+        self.simple_path_planner.path_base["y"][-1] = 2.
 
         self.assertTrue(self.simple_path_planner.check_require_plan())
 
@@ -57,17 +57,17 @@ class TestSimplePathPlanner(unittest.TestCase):
         self.simple_path_planner.target_base[0] = 1.
         self.simple_path_planner.target_base[1] = 1. 
 
-        self.simple_path_planner.path["x"] = np.array([0, 0])
-        self.simple_path_planner.path["y"] = np.array([0, 0])
+        self.simple_path_planner.path_base["x"] = np.array([0, 0])
+        self.simple_path_planner.path_base["y"] = np.array([0, 0])
 
-        self.simple_path_planner.path["x"][-1] = 1. 
-        self.simple_path_planner.path["y"][-1] = 1.
+        self.simple_path_planner.path_base["x"][-1] = 1. 
+        self.simple_path_planner.path_base["y"][-1] = 1.
 
         self.simple_path_planner.goal_base = np.zeros(3)
         self.simple_path_planner.goal_base[2] = 0
 
-        self.simple_path_planner.control_points["theta"] = np.zeros(3)
-        self.simple_path_planner.control_points["theta"][-1] = 1
+        self.simple_path_planner.control_points_base["theta"] = np.zeros(3)
+        self.simple_path_planner.control_points_base["theta"][-1] = 1
 
         self.assertTrue(self.simple_path_planner.check_require_plan())
 
@@ -81,17 +81,17 @@ class TestSimplePathPlanner(unittest.TestCase):
         self.simple_path_planner.target_base[0] = 1.
         self.simple_path_planner.target_base[1] = 1.
 
-        self.simple_path_planner.path["x"] = np.array([0, 0])
-        self.simple_path_planner.path["y"] = np.array([0, 0])
+        self.simple_path_planner.path_base["x"] = np.array([0, 0])
+        self.simple_path_planner.path_base["y"] = np.array([0, 0])
 
-        self.simple_path_planner.path["x"][-1] = 1.
-        self.simple_path_planner.path["y"][-1] = 1.
+        self.simple_path_planner.path_base["x"][-1] = 1.
+        self.simple_path_planner.path_base["y"][-1] = 1.
 
         self.simple_path_planner.goal_base = np.zeros(3)
         self.simple_path_planner.goal_base[2] = 0
 
-        self.simple_path_planner.control_points["theta"] = np.zeros(3)
-        self.simple_path_planner.control_points["theta"][-1] = 0
+        self.simple_path_planner.control_points_base["theta"] = np.zeros(3)
+        self.simple_path_planner.control_points_base["theta"][-1] = 0
 
         self.assertFalse(self.simple_path_planner.check_require_plan())
     #endregion
@@ -116,25 +116,25 @@ class TestSimplePathPlanner(unittest.TestCase):
 
         self.simple_path_planner.calculate_path_segments()
 
-        self.assertAlmostEqual(self.simple_path_planner.control_points["x"].all(),
+        self.assertAlmostEqual(self.simple_path_planner.control_points_base["x"].all(),
                                np.array([0., 2 + 0.3, 10.]).all(), msg="x calculation failed")
-        self.assertAlmostEqual(self.simple_path_planner.control_points["y"].all(),
+        self.assertAlmostEqual(self.simple_path_planner.control_points_base["y"].all(),
                                np.array([0., 0, 10.]).all(), msg="y calculation failed")
-        self.assertAlmostEqual(self.simple_path_planner.control_points["theta"].all(),
+        self.assertAlmostEqual(self.simple_path_planner.control_points_base["theta"].all(),
                                np.array([0., 0, 0.2915 + np.pi/2]).all(), msg="theta calculation failed")
 
     def test_calculate_bezier_curve(self):
         """
         Test the calculation of the bezier curve
         """
-        self.simple_path_planner.control_points["x"] = np.array([0, 4, 4])
-        self.simple_path_planner.control_points["y"] = np.array([0, 0, 5])
+        self.simple_path_planner.control_points_base["x"] = np.array([0, 4, 4])
+        self.simple_path_planner.control_points_base["y"] = np.array([0, 0, 5])
 
         self.simple_path_planner.calculate_bezier_curve()
 
-        self.assertEqual(self.simple_path_planner.path["x"].all(),
+        self.assertEqual(self.simple_path_planner.path_base["x"].all(),
                          np.array([0., 3., 4.]).all(), msg="x calculation wrong")
-        self.assertEqual(self.simple_path_planner.path["y"].all(),
+        self.assertEqual(self.simple_path_planner.path_base["y"].all(),
                          np.array([0., 1.25, 5.]).all(), msg="y calculation wrong")
         
     def test_calculate_orientation_axes(self):
@@ -158,8 +158,8 @@ class TestSimplePathPlanner(unittest.TestCase):
         function. That's why there's the flag and should something fail, it'll catch the 
         exception.
         """
-        self.simple_path_planner.start = np.linspace(0,2,3)
-        self.simple_path_planner.goal = np.linspace(3,5,3)
+        self.simple_path_planner.start_map = np.linspace(0,2,3)
+        self.simple_path_planner.goal_map = np.linspace(3,5,3)
 
         print_flag = False
 
@@ -178,9 +178,9 @@ class TestSimplePathPlanner(unittest.TestCase):
         """
         Test the plot path function
         """
-        self.simple_path_planner.start = np.linspace(0,2,3)
-        self.simple_path_planner.goal = np.linspace(3,5,3)
-        self.simple_path_planner.target = np.linspace(6,8,2)
+        self.simple_path_planner.start_map = np.linspace(0,2,3)
+        self.simple_path_planner.goal_map = np.linspace(3,5,3)
+        self.simple_path_planner.target_map = np.linspace(6,8,2)
 
         self.simple_path_planner.control_points_map["x"] = np.linspace(0,2,3)
         self.simple_path_planner.control_points_map["y"] = np.linspace(0,2,3)
@@ -203,8 +203,8 @@ class TestSimplePathPlanner(unittest.TestCase):
         """
         Test the plot position function
         """
-        self.simple_path_planner.start = np.linspace(0,2,3)
-        self.simple_path_planner.goal = np.linspace(3,5,3)
+        self.simple_path_planner.start_map = np.linspace(0,2,3)
+        self.simple_path_planner.goal_map = np.linspace(3,5,3)
         
         print_flag = False
 
@@ -224,9 +224,9 @@ class TestSimplePathPlanner(unittest.TestCase):
         """
         Test the plot position function
         """
-        self.simple_path_planner.start = np.linspace(0,2,3)
-        self.simple_path_planner.goal = np.linspace(3,5,3)
-        self.simple_path_planner.target = np.linspace(6,8,2)
+        self.simple_path_planner.start_map = np.linspace(0,2,3)
+        self.simple_path_planner.goal_map = np.linspace(3,5,3)
+        self.simple_path_planner.target_map = np.linspace(6,8,2)
         self.simple_path_planner.goal_base = np.linspace(6,8,3)
         self.simple_path_planner.target_base = np.linspace(6,8,3)
         

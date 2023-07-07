@@ -51,10 +51,10 @@ class PlannerNode(object):
 
         # Run
         while not rospy.is_shutdown():
-            print("Receiving goal?")
+            # print("Receiving goal?")
             if self.planner.received_goal:
                 # 1. Check if you need to calculate a plan
-                print("Checking for plan")
+                # print("Checking for plan")
                 plan_needed = self.planner.check_require_plan()
                 # 1.1 Yes: Calculate Plan
                 if plan_needed:
@@ -62,7 +62,10 @@ class PlannerNode(object):
                     if self.planner.check_in_feasible_region():
                         self.planner.calculate_path_segments()
                         self.planner.calculate_bezier_curve()
-                        self.calculated_path = True
+
+                        self.transform_results()
+
+                        self.planner.path_calculated = True
 
                         # Plot Path -> saves to file
                         self.planner.plot_path()
@@ -71,9 +74,10 @@ class PlannerNode(object):
                         self.planner.plot_position()
                 # 1.2 No: continue
 
-                if self.calculated_path:
+                if self.planner.path_calculated:
                     # 2. Get current waypoint
-                    self.planner.get_current_waypoint()
+                    current_position_map = self.planner.start_map[0:2]
+                    self.planner.get_current_waypoint(current_position_map)
 
                     # 3. Publish current waypoint
                     self.publish_current_waypoint()
@@ -95,19 +99,19 @@ class PlannerNode(object):
         """
         # map frame
         docking_station_pose = self.get_pose_from_mgs(docking_station_pose_msg.pose)
-        self.planner.goal[0] = docking_station_pose[0]
-        self.planner.goal[1] = docking_station_pose[1]
-        self.planner.goal[2] = docking_station_pose[5]
+        self.planner.goal_map[0] = docking_station_pose[0]
+        self.planner.goal_map[1] = docking_station_pose[1]
+        self.planner.goal_map[2] = docking_station_pose[5]
 
-        x_axis_docking_station, _ = self.planner.calculate_orientation_axes(self.planner.goal[2], -1)
-        self.planner.target = np.array([self.planner.goal[0] + x_axis_docking_station[0],
-                                        self.planner.goal[1] + x_axis_docking_station[1]])
+        x_axis_docking_station, _ = self.planner.calculate_orientation_axes(self.planner.goal_map[2], 1)
+        self.planner.target_map = np.array([self.planner.goal_map[0] + x_axis_docking_station[0],
+                                        self.planner.goal_map[1] + x_axis_docking_station[1]])
 
         target_map = PoseWithCovarianceStamped()
         target_map.header.frame_id = 'map'
         target_map.header.stamp = rospy.Time(0)
-        target_map.pose.pose.position.x = self.planner.target[0]
-        target_map.pose.pose.position.y = self.planner.target[1]
+        target_map.pose.pose.position.x = self.planner.target_map[0]
+        target_map.pose.pose.position.y = self.planner.target_map[1]
         target_map.pose.pose.position.z = 0.
         target_map.pose.pose.orientation.x = docking_station_pose_msg.pose.pose.orientation.x
         target_map.pose.pose.orientation.y = docking_station_pose_msg.pose.pose.orientation.y
@@ -155,41 +159,14 @@ class PlannerNode(object):
         return pose_base
 
 
-    def transform_to_map(self, pose_arg):
-        """
-        Transform a pose into map frame
-        """
-        pose_map = PoseStamped()
-
-        # Transform into map
-        tmp_pose = PoseStamped()
-        tmp_pose.header.frame_id = pose_arg.header.frame_id
-        tmp_pose.header.stamp = rospy.Time(0)
-        tmp_pose.pose.position.x = pose_arg.pose.pose.position.x
-        tmp_pose.pose.position.y = pose_arg.pose.pose.position.y
-        tmp_pose.pose.position.z = pose_arg.pose.pose.position.z
-        tmp_pose.pose.orientation.x = pose_arg.pose.pose.orientation.x
-        tmp_pose.pose.orientation.y = pose_arg.pose.pose.orientation.y
-        tmp_pose.pose.orientation.z = pose_arg.pose.pose.orientation.z
-        tmp_pose.pose.orientation.w = pose_arg.pose.pose.orientation.w
-
-        try:
-            pose_map = self.listener.transformPose('map', tmp_pose)
-
-        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            rospy.logwarn("[SPP]: Transform to base frame not available yet")
-
-        return pose_map
-
-
     def state_estimat_cb(self,estim):
         """
         Get SAM's pose from the DR into the planner
         """
         pose_sam = self.get_pose_from_mgs(estim.pose)
-        self.planner.start[0] = pose_sam[0]
-        self.planner.start[1] = pose_sam[1]
-        self.planner.start[2] = pose_sam[5]
+        self.planner.start_map[0] = pose_sam[0]
+        self.planner.start_map[1] = pose_sam[1]
+        self.planner.start_map[2] = pose_sam[5]
 
 
     def get_pose_from_mgs(self, pose):
@@ -217,31 +194,37 @@ class PlannerNode(object):
         return states
     #endregion
 
+    def transform_results(self):
+        """
+        Function to transform the control and waypoints into the map frame 
+        for plotting.
+        """
+        for pt in range(len(self.planner.control_points_base["x"])):
+            control_point_pose = self.transform_waypoint_to_pose([self.planner.control_points_base["x"][pt],
+                                                                  self.planner.control_points_base["y"][pt]])
+            control_point_map = self.transform_to_map(control_point_pose)
+            self.planner.control_points_map["x"][pt] = control_point_map.pose.position.x
+            self.planner.control_points_map["y"][pt] = control_point_map.pose.position.y
+
+        # "storing" the latest orientation of the docking station to check if it changes
+        # TODO: Find a better solution to this.
+        self.planner.control_points_map["theta"][-1] = self.planner.goal_map[2]
+
+        for pt in range(len(self.planner.path_base["x"])):
+            waypoint_pose = self.transform_waypoint_to_pose([self.planner.path_base["x"][pt],
+                                                             self.planner.path_base["y"][pt]])
+            waypoint_map = self.transform_to_map(waypoint_pose)
+            self.planner.path_map["x"][pt] = waypoint_map.pose.position.x
+            self.planner.path_map["y"][pt] = waypoint_map.pose.position.y
+
 
     def publish_current_waypoint(self):
         """
-        Transform the current waypoint into the map frame and publish it
+        Transform the current waypoint into pose and publish it
         """
-        try:
-            current_waypoint_base = self.transform_waypoint_to_pose(self.planner.current_waypoint)
-            tmp_waypoint_map = self.transform_to_map(current_waypoint_base)
+        current_waypoint_map = self.transform_waypoint_to_pose(self.planner.current_waypoint_map)
 
-            # We always publish PoseWithCovarianceStamped, but tf.listener only can transform PoseStamped.
-            current_waypoint_map = PoseWithCovarianceStamped()
-            current_waypoint_map.header.frame_id = 'map'
-            current_waypoint_map.header.stamp = rospy.Time(0)
-            current_waypoint_map.pose.pose.position.x = tmp_waypoint_map.pose.position.x
-            current_waypoint_map.pose.pose.position.y = tmp_waypoint_map.pose.position.y
-            current_waypoint_map.pose.pose.position.z = tmp_waypoint_map.pose.position.z
-            current_waypoint_map.pose.pose.orientation.x = tmp_waypoint_map.pose.orientation.x
-            current_waypoint_map.pose.pose.orientation.y = tmp_waypoint_map.pose.orientation.y
-            current_waypoint_map.pose.pose.orientation.z = tmp_waypoint_map.pose.orientation.z
-            current_waypoint_map.pose.pose.orientation.w = tmp_waypoint_map.pose.orientation.w
-
-            self.waypoint_pub.publish(current_waypoint_map)
-
-        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            rospy.logwarn("map frame not available yet")
+        self.waypoint_pub.publish(current_waypoint_map)
 
 
     def transform_waypoint_to_pose(self, waypoint):
@@ -250,7 +233,7 @@ class PlannerNode(object):
         """
         waypoint_pose = PoseWithCovarianceStamped()
         waypoint_pose.header.frame_id = self.base_frame
-        waypoint_pose.header.stamp = rospy.Time(0)
+        waypoint_pose.header.stamp = rospy.Time.now()
         waypoint_pose.pose.pose.position.x = waypoint[0]
         waypoint_pose.pose.pose.position.y = waypoint[1]
         waypoint_pose.pose.pose.position.z = 0
@@ -260,6 +243,34 @@ class PlannerNode(object):
         waypoint_pose.pose.pose.orientation.z = 0
 
         return waypoint_pose
+
+
+    def transform_to_map(self, pose_arg):
+        """
+        Transform a pose into map frame
+        """
+        pose_map = PoseStamped()
+
+        # Transform into map
+        tmp_pose = PoseStamped()
+        tmp_pose.header.frame_id = pose_arg.header.frame_id
+        tmp_pose.header.stamp = rospy.Time(0)
+        tmp_pose.pose.position.x = pose_arg.pose.pose.position.x
+        tmp_pose.pose.position.y = pose_arg.pose.pose.position.y
+        tmp_pose.pose.position.z = pose_arg.pose.pose.position.z
+        tmp_pose.pose.orientation.x = pose_arg.pose.pose.orientation.x
+        tmp_pose.pose.orientation.y = pose_arg.pose.pose.orientation.y
+        tmp_pose.pose.orientation.z = pose_arg.pose.pose.orientation.z
+        tmp_pose.pose.orientation.w = pose_arg.pose.pose.orientation.w
+
+        try:
+            pose_map = self.listener.transformPose('map', tmp_pose)
+
+        except Exception as e: #(tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            # rospy.logwarn("[SPP]: Transform to base frame not available yet")
+            rospy.logwarn("[SPP]: Transform to base frame failed: {}".format(e))
+
+        return pose_map
 
 
 if __name__ == "__main__":
