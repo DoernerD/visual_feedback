@@ -266,9 +266,8 @@ class PlannerNode(object):
         try:
             pose_map = self.listener.transformPose('map', tmp_pose)
 
-        except Exception as e: #(tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            # rospy.logwarn("[SPP]: Transform to base frame not available yet")
-            rospy.logwarn("[SPP]: Transform to base frame failed: {}".format(e))
+        except Exception as exception_msg:
+            rospy.logwarn("[SPP]: Transform to base frame failed: {}".format(exception_msg))
 
         return pose_map
 

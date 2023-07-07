@@ -10,9 +10,9 @@
 
 
     <!-- topics, note the root! -->
-    <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" />
+    <!-- TODO: Rename the topics correctly. -->
+    <!-- <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" /> -->
     <arg name="state_estimation_topic" default="/$(arg robot_name)/EstimatedPose" />
-    <arg name="vbs_topic" default="/$(arg robot_name)/core/vbs_cmd" />
     <arg name="ref_pose_topic" default="$(arg waypoint_topic_arg)" />
     <arg name="docking_station_pose_topic_arg" default="EstimatedStationPose"/>
 
@@ -27,7 +27,7 @@
         <param name="waypoint_topic" value="$(arg waypoint_topic_arg)" />
         <param name="docking_station_pose_topic" value="$(arg docking_station_pose_topic_arg)" />
 
-        <param name="state_feedback_topic" value="$(arg state_feedback_topic)" />
+        <!-- <param name="state_feedback_topic" value="$(arg state_feedback_topic)" /> -->
         <param name="state_estimation_topic" value="$(arg state_estimation_topic)" />
     </node>
 
