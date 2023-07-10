@@ -104,7 +104,7 @@ class WaypointFollowingController(object):
          
         # TF tree listener        
         self.listener = tf.TransformListener()
-        self.base_frame = 'sam/base_link/estimated'
+        self.base_frame = 'sam/base_link'
 
         rate = rospy.Rate(self.loop_freq) 
 
@@ -153,8 +153,9 @@ class WaypointFollowingController(object):
             self.ref[0] = goal_point_local.point.x
             self.ref[1] = goal_point_local.point.y
             self.ref[2] = goal_point_local.point.z
-        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            rospy.logwarn("[WPF]: Transform to base frame not available yet")
+        except Exception as exception_msg: #(tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            # rospy.logwarn("[WPF]: Transform to base frame not available yet")
+            rospy.logwarn("[WPF]: Can't transform WP: {}".format(exception_msg))
             pass
 
                
