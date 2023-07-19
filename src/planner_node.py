@@ -12,8 +12,9 @@ from simple_path_planner import SimplePathPlanner
 
 import rospy
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped
+from nav_msgs.msg import Odometry
 
-from tf.transformations import euler_from_quaternion
+from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_matrix, quaternion_from_matrix
 import tf
 
 class PlannerNode(object):
@@ -36,9 +37,9 @@ class PlannerNode(object):
         waypoint_topic = rospy.get_param("~waypoint_topic")
 
         # Subscribers
-        rospy.Subscriber(docking_station_pose_topic, PoseWithCovarianceStamped,
+        rospy.Subscriber(docking_station_pose_topic, Odometry,
                          self.docking_station_pose_cb, queue_size=1)
-        rospy.Subscriber(state_estimate_topic, PoseWithCovarianceStamped,
+        rospy.Subscriber(state_estimate_topic, Odometry,
                          self.state_estimat_cb, queue_size=1)
 
         # Publisher
@@ -47,6 +48,7 @@ class PlannerNode(object):
         # TF tree listener
         self.listener = tf.TransformListener()
         self.base_frame = 'sam/base_link'   # TODO: put that into the launch file.
+        self.planning_frame = 'sam/odom'    # The frame we get sam and the docking station in. 
 
 
         # Run
@@ -97,18 +99,37 @@ class PlannerNode(object):
         Callback to extract the docking station pose and calculate the 
         corresponding target for docking.
         """
-        # map frame
+        # sam/odom frame, but with the orientation of the camera frame
+        # To make things easier, we add a rotation to it, s.t. it's the same
+        # orientation as sam/base_link, e.g. ENU
         docking_station_pose = self.get_pose_from_mgs(docking_station_pose_msg.pose)
+
+        t_ds_pose = docking_station_pose[0:3]
+        quat_ds_pose = quaternion_from_euler(*docking_station_pose[3:6])
+        R_ds_pose = quaternion_matrix(quat_ds_pose)
+        
+        quat_rot_x = quaternion_from_euler(np.pi/2, 0., 0.)
+        R_rot_x = quaternion_matrix(quat_rot_x)
+
+        quat_rot_z = quaternion_from_euler(0., 0., np.pi/2)
+        R_rot_z = quaternion_matrix(quat_rot_z)
+
+        R_ds_prime = np.matmul(np.matmul(R_ds_pose, R_rot_x), R_rot_z)
+
+        quat_ds_prime = quaternion_from_matrix(R_ds_prime)
+        rpy_ds_prime = euler_from_quaternion(quat_ds_prime)
+
+
         self.planner.goal_map[0] = docking_station_pose[0]
         self.planner.goal_map[1] = docking_station_pose[1]
-        self.planner.goal_map[2] = docking_station_pose[5]
+        self.planner.goal_map[2] = rpy_ds_prime[2]
 
-        x_axis_docking_station, _ = self.planner.calculate_orientation_axes(self.planner.goal_map[2], 1)
+        x_axis_docking_station, _ = self.planner.calculate_orientation_axes(self.planner.goal_map[2], -1)
         self.planner.target_map = np.array([self.planner.goal_map[0] + x_axis_docking_station[0],
                                         self.planner.goal_map[1] + x_axis_docking_station[1]])
 
         target_map = PoseWithCovarianceStamped()
-        target_map.header.frame_id = 'map'
+        target_map.header.frame_id = 'sam/odom'
         target_map.header.stamp = rospy.Time(0)
         target_map.pose.pose.position.x = self.planner.target_map[0]
         target_map.pose.pose.position.y = self.planner.target_map[1]
@@ -132,7 +153,7 @@ class PlannerNode(object):
 
         # Transform into sam/baselink
         tmp_pose = PoseStamped()
-        tmp_pose.header.frame_id = 'map'
+        tmp_pose.header.frame_id = 'sam/odom'
         tmp_pose.header.stamp = rospy.Time(0)
         tmp_pose.pose.position.x = pose_arg.pose.pose.position.x
         tmp_pose.pose.position.y = pose_arg.pose.pose.position.y
@@ -201,7 +222,8 @@ class PlannerNode(object):
         """
         for pt in range(len(self.planner.control_points_base["x"])):
             control_point_pose = self.transform_waypoint_to_pose([self.planner.control_points_base["x"][pt],
-                                                                  self.planner.control_points_base["y"][pt]])
+                                                                  self.planner.control_points_base["y"][pt]],
+                                                                  self.base_frame)
             control_point_map = self.transform_to_map(control_point_pose)
             self.planner.control_points_map["x"][pt] = control_point_map.pose.position.x
             self.planner.control_points_map["y"][pt] = control_point_map.pose.position.y
@@ -212,7 +234,8 @@ class PlannerNode(object):
 
         for pt in range(len(self.planner.path_base["x"])):
             waypoint_pose = self.transform_waypoint_to_pose([self.planner.path_base["x"][pt],
-                                                             self.planner.path_base["y"][pt]])
+                                                             self.planner.path_base["y"][pt]],
+                                                             self.base_frame)
             waypoint_map = self.transform_to_map(waypoint_pose)
             self.planner.path_map["x"][pt] = waypoint_map.pose.position.x
             self.planner.path_map["y"][pt] = waypoint_map.pose.position.y
@@ -222,17 +245,17 @@ class PlannerNode(object):
         """
         Transform the current waypoint into pose and publish it
         """
-        current_waypoint_map = self.transform_waypoint_to_pose(self.planner.current_waypoint_map)
+        current_waypoint_map = self.transform_waypoint_to_pose(self.planner.current_waypoint_map, self.planning_frame)
 
         self.waypoint_pub.publish(current_waypoint_map)
 
 
-    def transform_waypoint_to_pose(self, waypoint):
+    def transform_waypoint_to_pose(self, waypoint, frame_id):
         """
         Transform the waypoint into a pose
         """
         waypoint_pose = PoseWithCovarianceStamped()
-        waypoint_pose.header.frame_id = self.base_frame
+        waypoint_pose.header.frame_id = frame_id
         waypoint_pose.header.stamp = rospy.Time.now()
         waypoint_pose.pose.pose.position.x = waypoint[0]
         waypoint_pose.pose.pose.position.y = waypoint[1]
@@ -264,7 +287,7 @@ class PlannerNode(object):
         tmp_pose.pose.orientation.w = pose_arg.pose.pose.orientation.w
 
         try:
-            pose_map = self.listener.transformPose('map', tmp_pose)
+            pose_map = self.listener.transformPose('sam/odom', tmp_pose)
 
         except Exception as exception_msg:
             rospy.logwarn("[SPP]: Transform to base frame failed: {}".format(exception_msg))

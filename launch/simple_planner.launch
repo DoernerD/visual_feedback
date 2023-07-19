@@ -12,9 +12,9 @@
     <!-- topics, note the root! -->
     <!-- TODO: Rename the topics correctly. -->
     <!-- <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" /> -->
-    <arg name="state_estimation_topic" default="/$(arg robot_name)/EstimatedPose" />
+    <arg name="state_estimation_topic" default="/$(arg robot_name)/slam/odom" />
     <arg name="ref_pose_topic" default="$(arg waypoint_topic_arg)" />
-    <arg name="docking_station_pose_topic_arg" default="EstimatedStationPose"/>
+    <arg name="docking_station_pose_topic_arg" default="/$(arg robot_name)/dr/ds_odom"/>
 
 
     <!-- Nodes -->

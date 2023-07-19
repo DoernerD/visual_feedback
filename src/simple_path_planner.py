@@ -147,7 +147,7 @@ class SimplePathPlanner(object):
         in the map frame.
         """
         distance_to_waypoint = self.calculate_distance_to_waypoint(current_position_map)
-        
+
         if distance_to_waypoint < self.eps:
             if self.current_index < len(self.path_map["x"])-1:
                 self.current_index += 1

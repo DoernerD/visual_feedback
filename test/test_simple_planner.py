@@ -17,7 +17,7 @@ class TestSimplePathPlanner(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
-        self.simple_path_planner =  SimplePathPlanner("SimplePathPlanner")
+        self.simple_path_planner =  SimplePathPlanner()
 
     # Test Cases
     #region testRequirePlan
@@ -35,39 +35,39 @@ class TestSimplePathPlanner(unittest.TestCase):
         """
         self.simple_path_planner.path_calculated = True
 
-        self.simple_path_planner.target_base = np.array([0, 0])
-        self.simple_path_planner.target_base[0] = 1.
-        self.simple_path_planner.target_base[1] = 1.
+        self.simple_path_planner.target_map = np.array([0, 0])
+        self.simple_path_planner.target_map[0] = 1.
+        self.simple_path_planner.target_map[1] = 1.
 
-        self.simple_path_planner.path_base["x"] = np.array([0, 0])
-        self.simple_path_planner.path_base["y"] = np.array([0, 0])
+        self.simple_path_planner.path_map["x"] = np.array([0, 0])
+        self.simple_path_planner.path_map["y"] = np.array([0, 0])
 
-        self.simple_path_planner.path_base["x"][-1] = 2.
-        self.simple_path_planner.path_base["y"][-1] = 2.
+        self.simple_path_planner.path_map["x"][-1] = 2.
+        self.simple_path_planner.path_map["y"][-1] = 2.
 
         self.assertTrue(self.simple_path_planner.check_require_plan())
 
     def test_require_plan_goal_rotated(self):
         """
-        Test planning wehn goal rotated
+        Test planning when goal rotated
         """
         self.simple_path_planner.path_calculated = True
 
-        self.simple_path_planner.target_base = np.array([0, 0])
-        self.simple_path_planner.target_base[0] = 1.
-        self.simple_path_planner.target_base[1] = 1. 
+        self.simple_path_planner.target_map = np.array([0, 0])
+        self.simple_path_planner.target_map[0] = 1.
+        self.simple_path_planner.target_map[1] = 1.
 
-        self.simple_path_planner.path_base["x"] = np.array([0, 0])
-        self.simple_path_planner.path_base["y"] = np.array([0, 0])
+        self.simple_path_planner.path_map["x"] = np.array([0, 0])
+        self.simple_path_planner.path_map["y"] = np.array([0, 0])
 
-        self.simple_path_planner.path_base["x"][-1] = 1. 
-        self.simple_path_planner.path_base["y"][-1] = 1.
+        self.simple_path_planner.path_map["x"][-1] = 1.
+        self.simple_path_planner.path_map["y"][-1] = 1.
 
-        self.simple_path_planner.goal_base = np.zeros(3)
-        self.simple_path_planner.goal_base[2] = 0
+        self.simple_path_planner.goal_map = np.zeros(3)
+        self.simple_path_planner.goal_map[2] = 0
 
-        self.simple_path_planner.control_points_base["theta"] = np.zeros(3)
-        self.simple_path_planner.control_points_base["theta"][-1] = 1
+        self.simple_path_planner.control_points_map["theta"] = np.zeros(3)
+        self.simple_path_planner.control_points_map["theta"][-1] = 1
 
         self.assertTrue(self.simple_path_planner.check_require_plan())
 
@@ -77,21 +77,21 @@ class TestSimplePathPlanner(unittest.TestCase):
         """
         self.simple_path_planner.path_calculated = True
 
-        self.simple_path_planner.target_base = np.array([0, 0])
-        self.simple_path_planner.target_base[0] = 1.
-        self.simple_path_planner.target_base[1] = 1.
+        self.simple_path_planner.target_map = np.array([0, 0])
+        self.simple_path_planner.target_map[0] = 1.
+        self.simple_path_planner.target_map[1] = 1.
 
-        self.simple_path_planner.path_base["x"] = np.array([0, 0])
-        self.simple_path_planner.path_base["y"] = np.array([0, 0])
+        self.simple_path_planner.path_map["x"] = np.array([0, 0])
+        self.simple_path_planner.path_map["y"] = np.array([0, 0])
 
-        self.simple_path_planner.path_base["x"][-1] = 1.
-        self.simple_path_planner.path_base["y"][-1] = 1.
+        self.simple_path_planner.path_map["x"][-1] = 1.
+        self.simple_path_planner.path_map["y"][-1] = 1.
 
-        self.simple_path_planner.goal_base = np.zeros(3)
-        self.simple_path_planner.goal_base[2] = 0
+        self.simple_path_planner.goal_map = np.zeros(3)
+        self.simple_path_planner.goal_map[2] = 0
 
-        self.simple_path_planner.control_points_base["theta"] = np.zeros(3)
-        self.simple_path_planner.control_points_base["theta"][-1] = 0
+        self.simple_path_planner.control_points_map["theta"] = np.zeros(3)
+        self.simple_path_planner.control_points_map["theta"][-1] = 0
 
         self.assertFalse(self.simple_path_planner.check_require_plan())
     #endregion
