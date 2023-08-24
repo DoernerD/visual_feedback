@@ -48,7 +48,7 @@ class PlannerNode(object):
         # TF tree listener
         self.listener = tf.TransformListener()
         self.base_frame = 'sam/base_link'   # TODO: put that into the launch file.
-        self.planning_frame = 'sam/odom'    # The frame we get sam and the docking station in. 
+        self.planning_frame = 'sam/odom'    # The frame we get sam and the docking station in.
 
 
         # Run

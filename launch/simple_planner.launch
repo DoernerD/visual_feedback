@@ -5,13 +5,14 @@
 
     <arg name="loop_freq" default="20."/>
     <arg name="verbose_arg" default="False"/>
+    <arg name="planner_verbose_arg" default="False"/>
 
     <arg name="waypoint_topic_arg" default="/waypoint_topic"/>
 
 
     <!-- topics, note the root! -->
     <!-- TODO: Rename the topics correctly. -->
-    <!-- <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" /> -->
+    <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" />
     <arg name="state_estimation_topic" default="/$(arg robot_name)/slam/odom" />
     <arg name="ref_pose_topic" default="$(arg waypoint_topic_arg)" />
     <arg name="docking_station_pose_topic_arg" default="/$(arg robot_name)/dr/ds_odom"/>
@@ -22,12 +23,12 @@
         output="screen">
 
         <param name="loop_freq" value="$(arg loop_freq)"/>
-        <param name="verbose" value="$(arg verbose_arg)"/>
+        <param name="verbose" value="$(arg planner_verbose_arg)"/>
 
         <param name="waypoint_topic" value="$(arg waypoint_topic_arg)" />
         <param name="docking_station_pose_topic" value="$(arg docking_station_pose_topic_arg)" />
 
-        <!-- <param name="state_feedback_topic" value="$(arg state_feedback_topic)" /> -->
+        <param name="state_feedback_topic" value="$(arg state_feedback_topic)" />
         <param name="state_estimation_topic" value="$(arg state_estimation_topic)" />
     </node>
 
