@@ -140,7 +140,7 @@ class WaypointFollowingController(object):
 
         # Transform waypoint map --> base frame
         goal_point = PointStamped()
-        goal_point.header.frame_id = 'map'
+        goal_point.header.frame_id = 'sam/odom'
         goal_point.header.stamp = rospy.Time(0)
         goal_point.point.x = estimFB.pose.pose.position.x
         goal_point.point.y = estimFB.pose.pose.position.y
@@ -331,16 +331,17 @@ class WaypointFollowingController(object):
         # Going forwards and backwards based on the distance to the target
         stopRadius = 0.2
         if self.distanceErr > stopRadius:
-            u[0] = 100
+            u[0] = 1
             
             # SIM CONTROLLER
             # u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt - Kaw[1]*self.antiWindupDifferenceInt[1])   # PI control vectoring (horizontal)
             
             # TANK CONTROLLER
+            # FIXME: This sign should probably be flipped.
             u[1] = -(Kp[1]*self.headingAngle + Ki[1]*self.headingAngleInt - Kaw[1]*self.antiWindupDifferenceInt[1])   # PI control vectoring (horizontal)
 
         elif self.distanceErr < -stopRadius:
-            u[0] = -100
+            u[0] = -1
             self.headingAngleScaled = np.sign(self.headingAngle) * (np.pi - np.abs(self.headingAngle))
             
             # SIM CONTROLLER
