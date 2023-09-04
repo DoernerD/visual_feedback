@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 # Copyright 2022 David Doerner (ddorner@kth.se)
 
 from __future__ import division, print_function

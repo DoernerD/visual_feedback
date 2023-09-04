@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 """
 Simple, bezier based path planner for underwater docking.
 

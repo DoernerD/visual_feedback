@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 """
 ROS Node for simple path planner for underwater proxops
 
