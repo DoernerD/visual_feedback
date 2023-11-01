@@ -53,7 +53,7 @@ class WaypointFollowingController(object):
         self.current_depth = 0.
 
         # Control Gains
-        self.Kp = np.array([100, 5, 5, 40, 60])      # P control gain
+        self.Kp = np.array([200, 5, 5, 40, 60])      # P control gain
         self.Ki = np.array([1., 0.1, 0.1, 0.1, 0.1])    # I control gain
         self.Kd = np.array([1., 1., 1., 1., 6.])    # D control gain
         self.Kaw = np.array([1., 1., 1., 1., 6.])   # Anti windup gain
@@ -146,6 +146,8 @@ class WaypointFollowingController(object):
                 self.print_states(u, u_limited)
 
             rate.sleep()
+
+        curses.endwin()  # return control back to the console
 
 
     #region Call-backs

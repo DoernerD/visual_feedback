@@ -70,10 +70,10 @@ class PlannerNode(object):
                         self.planner.path_calculated = True
 
                         # Plot Path -> saves to file
-                        self.planner.plot_path()
-                        self.planner.plot_tf_sam_base()
-                    else:
-                        self.planner.plot_position()
+                    #     self.planner.plot_path()
+                    #     self.planner.plot_tf_sam_base()
+                    # else:
+                    #     self.planner.plot_position()
                 # 1.2 No: continue
 
                 if self.planner.path_calculated:
