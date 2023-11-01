@@ -303,6 +303,7 @@ class WaypointFollowingController(object):
                 u[0] = self.calculate_velocity_control_action(self.velocity_x_desired)
 
                 u[1] = self.Kp[1]*self.heading_angle + self.Ki[1]*(self.heading_angle_error_integral - self.anti_windup_diff_integral[1]) + self.Kd[1]*self.heading_angle_error_deriv   # PID control vectoring (horizontal)
+                u[1] = -u[1] # FIXME: This is a hack to get the sign right. This is due to the conversion from ENU to NED for the thruster commands
 
             elif self.distance_error < -self.stop_radius:
                 u[0] = self.calculate_velocity_control_action(-0.5*self.velocity_x_desired)
@@ -310,6 +311,7 @@ class WaypointFollowingController(object):
                 self.heading_angle_scaled = np.sign(self.heading_angle) * (np.pi - np.abs(self.heading_angle))
 
                 u[1] = -(self.Kp[1]*self.heading_angle_scaled + (self.Ki[1]*(self.heading_angle_error_integral - self.anti_windup_diff_integral[1])) + self.Kd[1]*self.heading_angle_error_deriv)   # PID control vectoring (horizontal)
+                u[1] = -u[1] # FIXME: This is a hack to get the sign right. This is due to the conversion from ENU to NED for the thruster commands
 
             else:
                 u[0] = self.calculate_velocity_control_action(0)
