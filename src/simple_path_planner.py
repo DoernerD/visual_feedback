@@ -12,7 +12,7 @@ from __future__ import division, print_function
 import os
 
 import numpy as np
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 
 class SimplePathPlanner(object):
@@ -169,131 +169,148 @@ class SimplePathPlanner(object):
 
 
     #region Plotting
-    # def plot_path(self):
-    #     """
-    #     Plot Path in map frame
-    #     """
-    #     _, ax = plt.subplots()
-    #     plt.gca().set_aspect('equal')
+    def plot_path(self):
+        """
+        Plot Path in map frame
+        """
+        _, ax = plt.subplots()
+        plt.gca().set_aspect('equal')
 
-    #     # Path Planning
-    #     ax.plot(self.goal_map[0], self.goal_map[1], 'o', color='red', label='DS')
-    #     ax.plot(self.control_points_map["x"], self.control_points_map["y"], label='path')
-    #     ax.plot(self.control_points_map["x"][0] ,self.control_points_map["y"][0],
-    #             's', color='C2', markersize=10, label='start')
-    #     ax.plot(self.control_points_map["x"][1] ,self.control_points_map["y"][1],
-    #             'o', color='C2', markersize=10)
-    #     ax.plot(self.control_points_map["x"][-1] ,self.control_points_map["y"][-1],
-    #             '*', color='C2', markersize=10, label='end')
-    #     ax.plot(self.path_map["x"], self.path_map["y"], 'x')
-
-
-    #     # Coordinate visualization
-    #     origin_ds = [self.goal_map[0], self.goal_map[1]]
-    #     x_axis_ds, y_axis_ds = self.calculate_orientation_axes(self.goal_map[2], 0.5)
-
-    #     origin_sam = [self.start_map[0], self.start_map[1]]
-    #     x_axis_sam, y_axis_sam = self.calculate_orientation_axes(self.start_map[2], 0.5)
-
-    #     # DS Axes
-    #     plt.arrow(*origin_ds, *x_axis_ds, width=0.01, color='r')
-    #     plt.arrow(*origin_ds, *y_axis_ds, width=0.01, color='g')
-    #     plt.arrow(*self.target_map, *x_axis_ds, width=0.01, color='r')
-    #     plt.arrow(*self.target_map, *y_axis_ds, width=0.01, color='g')
-
-    #     # # SAM Coordinate axes
-    #     plt.arrow(*origin_sam, *x_axis_sam, width=0.01, color='r')
-    #     plt.arrow(*origin_sam, *y_axis_sam, width=0.01, color='g')
-
-    #     ax.set_xlabel('x')
-    #     ax.set_ylabel('y')
-    #     ax.set_title('map')
-    #     ax.legend()
-
-    #     home_dir = os.path.expanduser('~')
-    #     plt.savefig(home_dir + '/catkin_ws/src/visual_feedback/fig/bezierPathMap.png', dpi=300)
+        # Path Planning
+        ax.plot(self.goal_map[0], self.goal_map[1], 'o', color='red', label='DS')
+        ax.plot(self.control_points_map["x"], self.control_points_map["y"], label='path')
+        ax.plot(self.control_points_map["x"][0] ,self.control_points_map["y"][0],
+                's', color='C2', markersize=10, label='start')
+        ax.plot(self.control_points_map["x"][1] ,self.control_points_map["y"][1],
+                'o', color='C2', markersize=10)
+        ax.plot(self.control_points_map["x"][-1] ,self.control_points_map["y"][-1],
+                '*', color='C2', markersize=10, label='end')
+        ax.plot(self.path_map["x"], self.path_map["y"], 'x')
 
 
-    # def plot_position(self):
-    #     """
-    #     Plot position of SAM and docking station
-    #     """
-    #     _, ax = plt.subplots()
-    #     plt.gca().set_aspect('equal')
+        # Coordinate visualization
+        origin_ds = [self.goal_map[0], self.goal_map[1]]
+        x_axis_ds, y_axis_ds = self.calculate_orientation_axes(self.goal_map[2], 0.5)
 
-    #     # Path Planning
-    #     ax.plot(self.goal_map[0], self.goal_map[1], 'o', color='red', label='DS')
-    #     ax.plot(self.start_map[0], self.start_map[1], 'o', color='b', label='SAM')
+        origin_sam = [self.start_map[0], self.start_map[1]]
+        x_axis_sam, y_axis_sam = self.calculate_orientation_axes(self.start_map[2], 0.5)
 
-    #     # Coordinate visualization
-    #     origin_ds = [self.goal_map[0], self.goal_map[1]]
-    #     x_axis_ds, y_axis_ds = self.calculate_orientation_axes(self.goal_map[2], 0.5)
+        # DS Axes
+        plt.arrow(*origin_ds, *x_axis_ds, width=0.01, color='r')
+        plt.arrow(*origin_ds, *y_axis_ds, width=0.01, color='g')
+        plt.arrow(*self.target_map, *x_axis_ds, width=0.01, color='r')
+        plt.arrow(*self.target_map, *y_axis_ds, width=0.01, color='g')
 
-    #     origin_sam = [self.start_map[0], self.start_map[1]]
-    #     x_axis_sam, y_axis_sam = self.calculate_orientation_axes(self.start_map[2], 0.5)
+        # # SAM Coordinate axes
+        plt.arrow(*origin_sam, *x_axis_sam, width=0.01, color='r')
+        plt.arrow(*origin_sam, *y_axis_sam, width=0.01, color='g')
 
-    #     plt.arrow(*origin_ds, *x_axis_ds, width=0.01, color='r')
-    #     plt.arrow(*origin_ds, *y_axis_ds, width=0.01, color='g')
-    #     plt.arrow(*origin_sam, *x_axis_sam, width=0.01, color='r')
-    #     plt.arrow(*origin_sam, *y_axis_sam, width=0.01, color='g')
+        x_left, x_right = ax.set_xlim(min(self.start_map[0],self.goal_map[0])-1, max(self.start_map[0], self.goal_map[0])+1)
+        y_left, y_right = ax.set_ylim(min(self.start_map[1],self.goal_map[1])-1, max(self.start_map[1], self.goal_map[1])+1)
+       
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_title('map')
+        ax.legend()
 
-    #     ax.set_xlabel('x')
-    #     ax.set_ylabel('y')
-    #     ax.set_title('simple path')
-    #     ax.legend()
+        home_dir = os.path.expanduser('~')
+        plt.savefig(home_dir + '/catkin_ws/src/visual_feedback/fig/bezierPathMap.png', dpi=300)
 
-    #     home_dir = os.path.expanduser('~')
-    #     plt.savefig(home_dir + '/catkin_ws/src/visual_feedback/fig/position.png', dpi=300)
+        # import tikzplotlib
+
+        # tikzplotlib.save(home_dir + '/catkin_ws/src/visual_feedback/fig/bezierPathMap.tikz')
 
 
-    # def plot_tf_sam_base(self):
-    #     """
-    #     Plot everythin in SAM base_link
-    #     """
-    #     _, ax = plt.subplots()
-    #     plt.gca().set_aspect('equal')
 
-    #     # Path segments
-    #     ax.plot(self.control_points_base["x"], self.control_points_base["y"], label='path')
-    #     ax.plot(self.control_points_base["x"][0] ,self.control_points_base["y"][0],
-    #             's', color='C2', markersize=10, label='start')
-    #     ax.plot(self.control_points_base["x"][1] ,self.control_points_base["y"][1],
-    #             'o', color='C2', markersize=10)
-    #     ax.plot(self.control_points_base["x"][-1] ,self.control_points_base["y"][-1],
-    #             '*', color='C2', markersize=10, label='end')
-    #     ax.plot(self.path_base["x"], self.path_base["y"], 'x')
+    def plot_position(self):
+        """
+        Plot position of SAM and docking station
+        """
+        _, ax = plt.subplots()
+        plt.gca().set_aspect('equal')
 
-    #     # Targets
-    #     ax.plot(self.goal_base[0], self.goal_base[1], 'o', color='red', label='DS')
-    #     ax.plot(self.target_base[0], self.target_base[1], 'o', color='green', label='target')
-    #     ax.plot(0, 0, 'o', color='b', label='SAM')
+        # Path Planning
+        ax.plot(self.goal_map[0], self.goal_map[1], 'o', color='red', label='DS')
+        ax.plot(self.start_map[0], self.start_map[1], 'o', color='b', label='SAM')
 
-    #     # Coordinate visualization
-    #     origin_ds = [self.goal_base[0], self.goal_base[1]]
-    #     x_axis_ds, y_axis_ds = self.calculate_orientation_axes(self.goal_base[2], 0.5)
+        # Coordinate visualization
+        origin_ds = [self.goal_map[0], self.goal_map[1]]
+        x_axis_ds, y_axis_ds = self.calculate_orientation_axes(self.goal_map[2], 0.5)
 
-    #     origin_target_base = [self.target_base[0], self.target_base[1]]
+        origin_sam = [self.start_map[0], self.start_map[1]]
+        x_axis_sam, y_axis_sam = self.calculate_orientation_axes(self.start_map[2], 0.5)
 
-    #     origin_sam = [0, 0]
-    #     x_axis_sam, y_axis_sam = self.calculate_orientation_axes(0, 0.5)
+        plt.arrow(*origin_ds, *x_axis_ds, width=0.01, color='r')
+        plt.arrow(*origin_ds, *y_axis_ds, width=0.01, color='g')
+        plt.arrow(*origin_sam, *x_axis_sam, width=0.01, color='r')
+        plt.arrow(*origin_sam, *y_axis_sam, width=0.01, color='g')
 
-    #     plt.arrow(*origin_ds, *x_axis_ds, width=0.01, color='r')
-    #     plt.arrow(*origin_ds, *y_axis_ds, width=0.01, color='g')
-    #     plt.arrow(*origin_target_base, *x_axis_ds, width=0.01, color='r')
-    #     plt.arrow(*origin_target_base, *y_axis_ds, width=0.01, color='g')
+        # x_left, x_right = ax.set_xlim(min(self.start_map[0],self.goal_map[0])-1, max(self.start_map[0], self.goal_map[0])+1)
+        # y_left, y_right = ax.set_ylim(min(self.start_map[1],self.goal_map[1])-1, max(self.start_map[1], self.goal_map[1])+1)
+        
+        x_left, x_right = ax.set_xlim(0, 5)
+        y_left, y_right = ax.set_ylim(0, 10)
 
-    #     plt.arrow(*origin_target_base, *x_axis_sam, width=0.01, color='r', alpha=0.5)
-    #     plt.arrow(*origin_target_base, *y_axis_sam, width=0.01, color='g', alpha=0.5)
-    #     plt.arrow(*origin_sam, *x_axis_sam, width=0.01, color='r')
-    #     plt.arrow(*origin_sam, *y_axis_sam, width=0.01, color='g')
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_title('simple path')
+        ax.legend()
 
-    #     ax.set_xlabel('x')
-    #     ax.set_ylabel('y')
-    #     ax.set_title('sam/base_link')
-    #     ax.legend()
+        home_dir = os.path.expanduser('~')
+        plt.savefig(home_dir + '/catkin_ws/src/visual_feedback/fig/position.png', dpi=300)
 
-    #     home_dir = os.path.expanduser('~')
-    #     plt.savefig(home_dir + '/catkin_ws/src/visual_feedback/fig/bezierPathSAMFrame.png', dpi=300)
+        print("Axis Limits: x_left = {}, x_right = {}".format(x_left, x_right))
+        print("Axis Limits: y_left = {}, y_right = {}".format(y_left, y_right))
+
+
+    def plot_tf_sam_base(self):
+        """
+        Plot everythin in SAM base_link
+        """
+        _, ax = plt.subplots()
+        plt.gca().set_aspect('equal')
+
+        # Path segments
+        ax.plot(self.control_points_base["x"], self.control_points_base["y"], label='path')
+        ax.plot(self.control_points_base["x"][0] ,self.control_points_base["y"][0],
+                's', color='C2', markersize=10, label='start')
+        ax.plot(self.control_points_base["x"][1] ,self.control_points_base["y"][1],
+                'o', color='C2', markersize=10)
+        ax.plot(self.control_points_base["x"][-1] ,self.control_points_base["y"][-1],
+                '*', color='C2', markersize=10, label='end')
+        ax.plot(self.path_base["x"], self.path_base["y"], 'x')
+
+        # Targets
+        ax.plot(self.goal_base[0], self.goal_base[1], 'o', color='red', label='DS')
+        ax.plot(self.target_base[0], self.target_base[1], 'o', color='green', label='target')
+        ax.plot(0, 0, 'o', color='b', label='SAM')
+
+        # Coordinate visualization
+        origin_ds = [self.goal_base[0], self.goal_base[1]]
+        x_axis_ds, y_axis_ds = self.calculate_orientation_axes(self.goal_base[2], 0.5)
+
+        origin_target_base = [self.target_base[0], self.target_base[1]]
+
+        origin_sam = [0, 0]
+        x_axis_sam, y_axis_sam = self.calculate_orientation_axes(0, 0.5)
+
+        plt.arrow(*origin_ds, *x_axis_ds, width=0.01, color='r')
+        plt.arrow(*origin_ds, *y_axis_ds, width=0.01, color='g')
+        plt.arrow(*origin_target_base, *x_axis_ds, width=0.01, color='r')
+        plt.arrow(*origin_target_base, *y_axis_ds, width=0.01, color='g')
+
+        plt.arrow(*origin_target_base, *x_axis_sam, width=0.01, color='r', alpha=0.5)
+        plt.arrow(*origin_target_base, *y_axis_sam, width=0.01, color='g', alpha=0.5)
+        plt.arrow(*origin_sam, *x_axis_sam, width=0.01, color='r')
+        plt.arrow(*origin_sam, *y_axis_sam, width=0.01, color='g')
+
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_title('sam/base_link')
+        ax.legend()
+
+        home_dir = os.path.expanduser('~')
+        plt.savefig(home_dir + '/catkin_ws/src/visual_feedback/fig/bezierPathSAMFrame.png', dpi=300)
 
 
     def calculate_orientation_axes(self, theta, length_axis):

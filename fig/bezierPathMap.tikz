@@ -1,0 +1,121 @@
+% This file was created with tikzplotlib v0.10.1.
+\begin{tikzpicture}
+
+\definecolor{darkgray176}{RGB}{176,176,176}
+\definecolor{darkorange25512714}{RGB}{255,127,14}
+\definecolor{forestgreen4416044}{RGB}{44,160,44}
+\definecolor{green01270}{RGB}{0,127,0}
+\definecolor{lightgray204}{RGB}{204,204,204}
+\definecolor{steelblue31119180}{RGB}{31,119,180}
+
+\begin{axis}[
+legend cell align={left},
+legend style={
+  fill opacity=0.8,
+  draw opacity=1,
+  text opacity=1,
+  at={(0.03,0.97)},
+  anchor=north west,
+  draw=lightgray204
+},
+tick align=outside,
+tick pos=left,
+title={map},
+x grid style={darkgray176},
+xlabel={x},
+xmin=0.5, xmax=4,
+xtick style={color=black},
+y grid style={darkgray176},
+ylabel={y},
+ymin=0.5, ymax=8,
+ytick style={color=black}
+]
+\path [draw=red, fill=red]
+(axis cs:3.545,7)
+--(axis cs:3.5,6.985)
+--(axis cs:3.5,6.995)
+--(axis cs:3,6.995)
+--(axis cs:3,7.005)
+--(axis cs:3.5,7.005)
+--(axis cs:3.5,7.015)
+--cycle;
+\path [draw=green01270, fill=green01270]
+(axis cs:3,7.545)
+--(axis cs:3.015,7.5)
+--(axis cs:3.005,7.5)
+--(axis cs:3.005,7)
+--(axis cs:2.995,7)
+--(axis cs:2.995,7.5)
+--(axis cs:2.985,7.5)
+--cycle;
+\path [draw=red, fill=red]
+(axis cs:3.545,6)
+--(axis cs:3.5,5.985)
+--(axis cs:3.5,5.995)
+--(axis cs:3,5.995)
+--(axis cs:3,6.005)
+--(axis cs:3.5,6.005)
+--(axis cs:3.5,6.015)
+--cycle;
+\path [draw=green01270, fill=green01270]
+(axis cs:3,6.545)
+--(axis cs:3.015,6.5)
+--(axis cs:3.005,6.5)
+--(axis cs:3.005,6)
+--(axis cs:2.995,6)
+--(axis cs:2.995,6.5)
+--(axis cs:2.985,6.5)
+--cycle;
+\path [draw=red, fill=red]
+(axis cs:1.88537319669009,1.88537319480325)
+--(axis cs:1.86415999315063,1.84294678798399)
+--(axis cs:1.85708892535607,1.85001785581317)
+--(axis cs:1.50353553389728,1.49646446608541)
+--(axis cs:1.49646446610272,1.50353553391459)
+--(axis cs:1.85001785756152,1.85708892364234)
+--(axis cs:1.84294678976696,1.86415999147152)
+--cycle;
+\path [draw=green01270, fill=green01270]
+(axis cs:1.11462680519675,1.88537319669009)
+--(axis cs:1.15705321201601,1.86415999315063)
+--(axis cs:1.14998214418683,1.85708892535607)
+--(axis cs:1.50353553391459,1.50353553389728)
+--(axis cs:1.49646446608541,1.49646446610272)
+--(axis cs:1.14291107635766,1.85001785756152)
+--(axis cs:1.13584000852848,1.84294678976696)
+--cycle;
+\addplot [semithick, red, mark=*, mark size=3, mark options={solid}, only marks]
+table {%
+3 7
+};
+\addlegendentry{DS}
+\addplot [semithick, steelblue31119180]
+table {%
+1.5 1.5
+3.00000000967562 3.00000000233144
+3.00000000967562 6.00000000967562
+};
+\addlegendentry{path}
+\addplot [semithick, forestgreen4416044, mark=square*, mark size=5, mark options={solid}, only marks]
+table {%
+1.5 1.5
+};
+\addlegendentry{start}
+\addplot [semithick, forestgreen4416044, mark=*, mark size=5, mark options={solid}, only marks, forget plot]
+table {%
+3.00000000967562 3.00000000233144
+};
+\addplot [semithick, forestgreen4416044, mark=asterisk, mark size=5, mark options={solid}, only marks]
+table {%
+3.00000000967562 6.00000000967562
+};
+\addlegendentry{end}
+\addplot [semithick, darkorange25512714, mark=x, mark size=3, mark options={solid}, only marks, forget plot]
+table {%
+1.5 1.5
+2.62500000725672 3.37500000358462
+3.00000000967562 6.00000000967562
+};
+\end{axis}
+
+\end{tikzpicture}

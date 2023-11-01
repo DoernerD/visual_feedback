@@ -3,6 +3,8 @@ import rospy
 
 import tf
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from nav_msgs.msg import Odometry
+
 
 class PoseBroadcaster(object):
     def __init__(self,name):
@@ -16,7 +18,7 @@ class PoseBroadcaster(object):
         self.estimPup = rospy.Publisher(estimTopic, PoseWithCovarianceStamped, queue_size=1)
 
         rospy.Subscriber(frameTopic,
-                        PoseWithCovarianceStamped,
+                        Odometry,
                         self.handle_pose,
                         frameName)
         
@@ -33,10 +35,10 @@ class PoseBroadcaster(object):
                         (msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z,msg.pose.pose.orientation.w),
                         rospy.Time.now(),
                         frameName,
-                        "map")
+                        "sam/odom")
         
         self.DSpose = PoseWithCovarianceStamped()
-        self.DSpose.header.frame_id = 'map'
+        self.DSpose.header.frame_id = 'sam/odom'
         self.DSpose.header.stamp = rospy.Time(0)
         self.DSpose.pose.pose.position.x = msg.pose.pose.position.x
         self.DSpose.pose.pose.position.y = msg.pose.pose.position.x

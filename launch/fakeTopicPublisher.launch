@@ -21,22 +21,22 @@
     <node name="tf_broadcaster_DS" pkg="visual_feedback" type="tf_broadcaster.py"
         output="screen">
 
-        <param name="frameName" value="EstimatedStationPose"/>
-        <param name="frameTopic" value="/EstimatedStationPose"/>
+        <param name="frameName" value="ds_base_link"/>
+        <param name="frameTopic" value="/sam/dr/ds_odom"/>
     </node>
 
     <node name="fakeTopics" pkg="visual_feedback" type="fakeTopicPublisher.py"
         output="screen">
 
-        <param name="frameName" value="EstimatedStationPose"/>
-        <param name="frameTopic" value="DSPose"/>
+        <param name="frameName" value="ds_base_link"/>
+        <param name="frameTopic" value="/sam/dr/ds_odom"/>
     </node>
 
     <node name="tf_broadcaster_SAM" pkg="visual_feedback" type="tf_broadcaster.py"
         output="screen">
 
         <param name="frameName" value="sam/base_link"/>
-        <param name="frameTopic" value="/sam/EstimatedPose"/>
+        <param name="frameTopic" value="/sam/slam/odom"/>
     </node>
 
 

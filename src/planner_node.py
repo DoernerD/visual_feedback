@@ -70,10 +70,10 @@ class PlannerNode(object):
                         self.planner.path_calculated = True
 
                         # Plot Path -> saves to file
-                    #     self.planner.plot_path()
-                    #     self.planner.plot_tf_sam_base()
-                    # else:
-                    #     self.planner.plot_position()
+                        self.planner.plot_path()
+                        self.planner.plot_tf_sam_base()
+                    else:
+                        self.planner.plot_position()
                 # 1.2 No: continue
 
                 if self.planner.path_calculated:
@@ -124,9 +124,9 @@ class PlannerNode(object):
         self.planner.goal_map[1] = docking_station_pose[1]
         self.planner.goal_map[2] = rpy_ds_prime[2]
 
-        x_axis_docking_station, _ = self.planner.calculate_orientation_axes(self.planner.goal_map[2], -1)
-        self.planner.target_map = np.array([self.planner.goal_map[0] + x_axis_docking_station[0],
-                                        self.planner.goal_map[1] + x_axis_docking_station[1]])
+        x_axis_docking_station, y_axis_docking_station = self.planner.calculate_orientation_axes(self.planner.goal_map[2], -1)
+        self.planner.target_map = np.array([self.planner.goal_map[0] + y_axis_docking_station[0],
+                                        self.planner.goal_map[1] + y_axis_docking_station[1]])
 
         target_map = PoseWithCovarianceStamped()
         target_map.header.frame_id = 'sam/odom'

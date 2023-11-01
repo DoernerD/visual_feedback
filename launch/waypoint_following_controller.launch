@@ -25,20 +25,6 @@
 
 
     <!-- Nodes -->
-    <node name="SimplePathPlanner" pkg="visual_feedback" type="planner_node.py"
-        output="screen">
-
-        <param name="loop_freq" value="$(arg loop_freq)"/>
-        <param name="verbose" value="$(arg planner_verbose_arg)"/>
-
-
-        <param name="waypoint_topic" value="$(arg waypoint_topic_arg)" />
-        <param name="docking_station_pose_topic" value="$(arg docking_station_pose_topic_arg)" />
-
-        <param name="state_feedback_topic" value="$(arg state_feedback_topic)" />
-        <param name="state_estimation_topic" value="$(arg state_estimation_topic)" />
-    </node>
-
     <node name="WaypointFollowingController" pkg="visual_feedback" type="WaypointFollowingController.py"
         output="screen" ns="$(arg robot_name)/ctrl">
 
