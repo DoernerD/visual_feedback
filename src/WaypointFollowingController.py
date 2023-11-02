@@ -31,7 +31,6 @@ class WaypointFollowingController(object):
         verbose = rospy.get_param("~verbose", True)
 
         # Init
-        self.velocity = np.array([0., 0., 0., 0., 0., 0.])
         self.state_estimated = np.array([0., 0., 0.1, 1., 0., 0.])
         self.x_ref = 0.
         self.y_ref = 0.
@@ -41,16 +40,14 @@ class WaypointFollowingController(object):
         self.yaw_ref = 0.
         self.ref = np.array([self.x_ref, self.y_ref, self.z_ref, self.roll_ref, self.pitch_ref, self.yaw_ref])
 
-        # Desired depth and pitch for the experiments (limited to 2D plane)
-        # In simulation depth is negative (ENU), in reality, it's positive (NED)
-        # TODO: replace desired depth with the depth from the docking station. That
-        #       requires some thinking, because then we deal with a relative difference
-        #       again instead of an absolute w.r.t the depth measurement.
-        self.depth_desired = -1
-        self.pitch_desired = 0.
-        self.velocity_x_desired = 1
-
-        self.current_depth = 0.
+        self.velocity = np.array([0., 0., 0., 0., 0., 0.])
+        self.vel_x_ref = 0.
+        self.vel_y_ref = 0.
+        self.vel_z_ref = 0.
+        self.vel_roll_ref = 0.
+        self.vel_pitch_ref = 0.
+        self.vel_yaw_ref = 0.
+        self.vel_ref = np.array([self.vel_x_ref, self.vel_y_ref, self.vel_z_ref, self.vel_roll_ref, self.vel_pitch_ref, self.vel_yaw_ref])
 
         # Control Gains
         self.Kp = np.array([200, 5, 5, 40, 60])      # P control gain
@@ -99,7 +96,6 @@ class WaypointFollowingController(object):
         self.limit_output_cnt = 0
 
         # Topics for feedback and actuators
-        odom_topic = rospy.get_param("~odom_topic", "/sam/core/odom")
         vbs_topic = rospy.get_param("~vbs_topic", "/sam/core/vbs_cmd")
         lcg_topic = rospy.get_param("~lcg_topic", "/sam/core/lcg_cmd")
         rpm1_topic = rospy.get_param("~rpm_topic_1", "/sam/core/thruster1_cmd")
@@ -110,7 +106,6 @@ class WaypointFollowingController(object):
         state_estimate_topic = rospy.get_param("~state_estimation_topic")
 
         # Subscribers to state feedback, setpoints and enable flags
-        rospy.Subscriber(odom_topic, Odometry, self.odom_callback, queue_size=1)
         rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.waypoint_callback, queue_size=1)
         rospy.Subscriber(state_estimate_topic, Odometry, self.estimation_callback, queue_size=1)
 
@@ -151,66 +146,62 @@ class WaypointFollowingController(object):
 
 
     #region Call-backs
-    def odom_callback(self, odom):
-        """
-        Get the current velocity from the odom message from the DR.
-        """
-        self.velocity = [odom.twist.twist.linear.x,
-                         odom.twist.twist.linear.y,
-                         odom.twist.twist.linear.z,
-                         odom.twist.twist.angular.x,
-                         odom.twist.twist.angular.y,
-                         odom.twist.twist.angular.z]
-
-
     def estimation_callback(self, estim):
         """
         Get the current state of the vehicle from the state estimation node.
         """
         self.state_estimated = self.get_euler_from_quaternion(estim.pose)
+        self.velocity = [estim.twist.twist.linear.x,
+                         estim.twist.twist.linear.y,
+                         estim.twist.twist.linear.z,
+                         estim.twist.twist.angular.x,
+                         estim.twist.twist.angular.y,
+                         estim.twist.twist.angular.z]
 
 
-    def waypoint_callback(self,estimFB):
+    def waypoint_callback(self,waypoint_ref):
         """
         Get the current waypoint from the planner node and convert it to the base frame.
         """
-        # Get way point in map frame
-        self.ref = np.zeros([6])
+        waypoint_euler = self.get_euler_from_quaternion(waypoint_ref.pose)
 
         # Transform waypoint map --> base frame
         goal_point = PointStamped()
         goal_point.header.frame_id = 'sam/odom'
         goal_point.header.stamp = rospy.Time(0)
-        goal_point.point.x = estimFB.pose.pose.position.x
-        goal_point.point.y = estimFB.pose.pose.position.y
-        goal_point.point.z = estimFB.pose.pose.position.z
+        goal_point.point.x = waypoint_euler[0]
+        goal_point.point.y = waypoint_euler[1]
+        goal_point.point.z = waypoint_euler[2]
 
         try:
             goal_point_local = self.listener.transformPoint(
                 self.base_frame, goal_point)
                         
+            # Pose references
             self.ref[0] = goal_point_local.point.x
             self.ref[1] = goal_point_local.point.y
             self.ref[2] = goal_point_local.point.z
-            # enforcing depth and pitch rather than using the docking station estimate.
-            # FIXME: This should be obsolete with the new estimation node. Then this can
-            #       be removed!
-            self.ref[2] = self.depth_desired
-            self.ref[4] = self.pitch_desired
+            self.ref[4] = waypoint_euler[4]
+
+            # Velocity references
+            self.vel_ref[0] = waypoint_ref.twist.twist.linear.x
+
         except Exception as exception_msg:
             rospy.logwarn("[WPF]: Can't transform WP: {}".format(exception_msg))
 
 
     def get_euler_from_quaternion(self, pose):
         """
-        The callback extracts the position and Euler angles.
+        Extracts the position and Euler angles.
         """
-        # Pose in ENU
-        x = pose.pose.position.x
+         x = pose.pose.position.x
         y = pose.pose.position.y
         z = pose.pose.position.z
 
-        quat = [pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w]
+        quat = [pose.pose.orientation.x,
+                pose.pose.orientation.y,
+                pose.pose.orientation.z,
+                pose.pose.orientation.w]
 
         rpy = euler_from_quaternion(quat)
 
@@ -302,13 +293,13 @@ class WaypointFollowingController(object):
 
             # FIXME: Check the u[1] calculation. Seems sketchy with the flipping and esp. with the integral when you change signs. Not good!
             if self.distance_error > self.stop_radius:
-                u[0] = self.calculate_velocity_control_action(self.velocity_x_desired)
+                u[0] = self.calculate_velocity_control_action(self.vel_ref[0])
 
                 u[1] = self.Kp[1]*self.heading_angle + self.Ki[1]*(self.heading_angle_error_integral - self.anti_windup_diff_integral[1]) + self.Kd[1]*self.heading_angle_error_deriv   # PID control vectoring (horizontal)
                 u[1] = -u[1] # FIXME: This is a hack to get the sign right. This is due to the conversion from ENU to NED for the thruster commands
 
             elif self.distance_error < -self.stop_radius:
-                u[0] = self.calculate_velocity_control_action(-0.5*self.velocity_x_desired)
+                u[0] = self.calculate_velocity_control_action(-0.5*self.vel_ref[0])
 
                 self.heading_angle_scaled = np.sign(self.heading_angle) * (np.pi - np.abs(self.heading_angle))
 
