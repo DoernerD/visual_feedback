@@ -50,7 +50,7 @@ class WaypointFollowingController(object):
         self.vel_ref = np.array([self.vel_x_ref, self.vel_y_ref, self.vel_z_ref, self.vel_roll_ref, self.vel_pitch_ref, self.vel_yaw_ref])
 
         # Control Gains
-        self.Kp = np.array([1000, 5, 5, 40, 60])      # P control gain
+        self.Kp = np.array([2000, 5, 5, 40, 60])      # P control gain
         self.Ki = np.array([10., 0.1, 0.1, 0.1, 0.1])    # I control gain
         self.Kd = np.array([1., 1., 1., 1., 6.])    # D control gain
         self.Kaw = np.array([1., 1., 1., 1., 6.])   # Anti windup gain
