@@ -30,6 +30,7 @@ class PlannerNode(object):
 
         # Init planner
         self.planner = SimplePathPlanner()
+        self.docking_station_depth = 0.
 
         # Topics
         docking_station_pose_topic = rospy.get_param("~docking_station_pose_topic")
@@ -43,7 +44,7 @@ class PlannerNode(object):
                          self.state_estimat_cb, queue_size=1)
 
         # Publisher
-        self.waypoint_pub = rospy.Publisher(waypoint_topic, PoseWithCovarianceStamped, queue_size=1)
+        self.waypoint_pub = rospy.Publisher(waypoint_topic, Odometry, queue_size=1)
 
         # TF tree listener
         self.listener = tf.TransformListener()
@@ -103,6 +104,8 @@ class PlannerNode(object):
         # To make things easier, we add a rotation to it, s.t. it's the same
         # orientation as sam/base_link, e.g. ENU
         docking_station_pose = self.get_pose_from_mgs(docking_station_pose_msg.pose)
+
+        self.docking_station_depth = docking_station_pose[2]
 
         t_ds_pose = docking_station_pose[0:3]
         quat_ds_pose = quaternion_from_euler(*docking_station_pose[3:6])
@@ -254,16 +257,22 @@ class PlannerNode(object):
         """
         Transform the waypoint into a pose
         """
-        waypoint_pose = PoseWithCovarianceStamped()
+        waypoint_pose = Odometry()
         waypoint_pose.header.frame_id = frame_id
         waypoint_pose.header.stamp = rospy.Time.now()
         waypoint_pose.pose.pose.position.x = waypoint[0]
         waypoint_pose.pose.pose.position.y = waypoint[1]
-        waypoint_pose.pose.pose.position.z = 0
+        waypoint_pose.pose.pose.position.z = self.docking_station_depth
         waypoint_pose.pose.pose.orientation.w = 0
         waypoint_pose.pose.pose.orientation.x = 0
         waypoint_pose.pose.pose.orientation.y = 0
         waypoint_pose.pose.pose.orientation.z = 0
+        waypoint_pose.twist.twist.linear.x = 0
+        waypoint_pose.twist.twist.linear.y = 0
+        waypoint_pose.twist.twist.linear.z = 0
+        waypoint_pose.twist.twist.angular.x = 0
+        waypoint_pose.twist.twist.angular.y = 0
+        waypoint_pose.twist.twist.angular.z = 0
 
         return waypoint_pose
 

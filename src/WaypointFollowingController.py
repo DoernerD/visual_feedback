@@ -106,7 +106,7 @@ class WaypointFollowingController(object):
         state_estimate_topic = rospy.get_param("~state_estimation_topic")
 
         # Subscribers to state feedback, setpoints and enable flags
-        rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.waypoint_callback, queue_size=1)
+        rospy.Subscriber(ref_pose_topic, Odometry, self.waypoint_callback, queue_size=1)
         rospy.Subscriber(state_estimate_topic, Odometry, self.estimation_callback, queue_size=1)
 
         # Publisher to actuators
@@ -124,7 +124,8 @@ class WaypointFollowingController(object):
 
         rospy.logwarn("[WPF]: Controller Initialized")
 
-        self.console = curses.initscr()  # initialize is our playground
+        if verbose:
+            self.console = curses.initscr()  # initialize is our playground
 
         # Run
         while not rospy.is_shutdown():
@@ -142,7 +143,8 @@ class WaypointFollowingController(object):
 
             rate.sleep()
 
-        curses.endwin()  # return control back to the console
+        if verbose:
+            curses.endwin()  # return control back to the console
 
 
     #region Call-backs
@@ -180,7 +182,11 @@ class WaypointFollowingController(object):
             # Pose references
             self.ref[0] = goal_point_local.point.x
             self.ref[1] = goal_point_local.point.y
-            self.ref[2] = goal_point_local.point.z
+
+            # We don't transform the depth and the pitch
+            # since we compare them to sensor data and 
+            # therefore need absolute values.
+            self.ref[2] = waypoint_euler[2]
             self.ref[4] = waypoint_euler[4]
 
             # Velocity references
@@ -194,7 +200,7 @@ class WaypointFollowingController(object):
         """
         Extracts the position and Euler angles.
         """
-         x = pose.pose.position.x
+        x = pose.pose.position.x
         y = pose.pose.position.y
         z = pose.pose.position.z
 
@@ -263,6 +269,10 @@ class WaypointFollowingController(object):
 
         self.error_prev = self.error
         self.error = self.ref - self.state_estimated
+
+        # Depth is always negative, which is why we change the signs on the
+        # depth error. Then we can keep the remainder of the control structure
+        self.error[2] = -self.error[2]
 
         # Anti windup integral is calculated separately, because
         # dim(e) != dim(u).
