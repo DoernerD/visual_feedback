@@ -50,8 +50,8 @@ class WaypointFollowingController(object):
         self.vel_ref = np.array([self.vel_x_ref, self.vel_y_ref, self.vel_z_ref, self.vel_roll_ref, self.vel_pitch_ref, self.vel_yaw_ref])
 
         # Control Gains
-        self.Kp = np.array([200, 5, 5, 40, 60])      # P control gain
-        self.Ki = np.array([1., 0.1, 0.1, 0.1, 0.1])    # I control gain
+        self.Kp = np.array([1000, 5, 5, 40, 60])      # P control gain
+        self.Ki = np.array([10., 0.1, 0.1, 0.1, 0.1])    # I control gain
         self.Kd = np.array([1., 1., 1., 1., 6.])    # D control gain
         self.Kaw = np.array([1., 1., 1., 1., 6.])   # Anti windup gain
 
@@ -411,7 +411,7 @@ class WaypointFollowingController(object):
             self.console.addstr(1,0, (""))
             self.console.addstr(2,0, "Current States: {}".format(np.array2string(self.state_estimated, precision = 2, suppress_small = True, floatmode = 'fixed')))
             self.console.addstr(3,0, "Reference States: {}".format(np.array2string(self.ref, precision = 2, suppress_small = True, floatmode = 'fixed')))
-            self.console.addstr(4,0, "Distance Error: {:.4f}, Heading Angle: {:.2f}, Depth Error: {:.2f}".format(self.distance_error, self.heading_angle, self.error[2]))
+            self.console.addstr(4,0, "Distance Error: {:.4f}, Heading Angle: {:.2f}, Depth Error: {:.2f}, velocity error: {:.2f}".format(self.distance_error, self.heading_angle, self.error[2], self.error_velocity))
             self.console.addstr(5,0, (""))
             self.console.addstr(6,0, "                   [RPM,  hor,  ver,  vbs,  lcg]")
             self.console.addstr(7,0, "Control Input raw: {}".format(np.array2string(u, precision = 2, floatmode = 'fixed')))
