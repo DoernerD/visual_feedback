@@ -50,8 +50,8 @@ class WaypointFollowingController(object):
         self.vel_ref = np.array([self.vel_x_ref, self.vel_y_ref, self.vel_z_ref, self.vel_roll_ref, self.vel_pitch_ref, self.vel_yaw_ref])
 
         # Control Gains
-        self.Kp = np.array([200, 5, 5, 40, 60])      # P control gain
-        self.Ki = np.array([1., 0.1, 0.1, 0.1, 0.1])    # I control gain
+        self.Kp = np.array([1000, 5, 5, 40, 60])      # P control gain
+        self.Ki = np.array([10., 0.1, 0.1, 0.1, 0.1])    # I control gain
         self.Kd = np.array([1., 1., 1., 1., 6.])    # D control gain
         self.Kaw = np.array([1., 1., 1., 1., 6.])   # Anti windup gain
 
@@ -106,7 +106,7 @@ class WaypointFollowingController(object):
         state_estimate_topic = rospy.get_param("~state_estimation_topic")
 
         # Subscribers to state feedback, setpoints and enable flags
-        rospy.Subscriber(ref_pose_topic, PoseWithCovarianceStamped, self.waypoint_callback, queue_size=1)
+        rospy.Subscriber(ref_pose_topic, Odometry, self.waypoint_callback, queue_size=1)
         rospy.Subscriber(state_estimate_topic, Odometry, self.estimation_callback, queue_size=1)
 
         # Publisher to actuators
@@ -124,7 +124,8 @@ class WaypointFollowingController(object):
 
         rospy.logwarn("[WPF]: Controller Initialized")
 
-        self.console = curses.initscr()  # initialize is our playground
+        if verbose:
+            self.console = curses.initscr()  # initialize is our playground
 
         # Run
         while not rospy.is_shutdown():
@@ -142,7 +143,8 @@ class WaypointFollowingController(object):
 
             rate.sleep()
 
-        curses.endwin()  # return control back to the console
+        if verbose:
+            curses.endwin()  # return control back to the console
 
 
     #region Call-backs
@@ -180,7 +182,11 @@ class WaypointFollowingController(object):
             # Pose references
             self.ref[0] = goal_point_local.point.x
             self.ref[1] = goal_point_local.point.y
-            self.ref[2] = goal_point_local.point.z
+
+            # We don't transform the depth and the pitch
+            # since we compare them to sensor data and 
+            # therefore need absolute values.
+            self.ref[2] = waypoint_euler[2]
             self.ref[4] = waypoint_euler[4]
 
             # Velocity references
@@ -194,7 +200,7 @@ class WaypointFollowingController(object):
         """
         Extracts the position and Euler angles.
         """
-         x = pose.pose.position.x
+        x = pose.pose.position.x
         y = pose.pose.position.y
         z = pose.pose.position.z
 
@@ -263,6 +269,10 @@ class WaypointFollowingController(object):
 
         self.error_prev = self.error
         self.error = self.ref - self.state_estimated
+
+        # Depth is always negative, which is why we change the signs on the
+        # depth error. Then we can keep the remainder of the control structure
+        self.error[2] = -self.error[2]
 
         # Anti windup integral is calculated separately, because
         # dim(e) != dim(u).
@@ -401,7 +411,7 @@ class WaypointFollowingController(object):
             self.console.addstr(1,0, (""))
             self.console.addstr(2,0, "Current States: {}".format(np.array2string(self.state_estimated, precision = 2, suppress_small = True, floatmode = 'fixed')))
             self.console.addstr(3,0, "Reference States: {}".format(np.array2string(self.ref, precision = 2, suppress_small = True, floatmode = 'fixed')))
-            self.console.addstr(4,0, "Distance Error: {:.4f}, Heading Angle: {:.2f}, Depth Error: {:.2f}".format(self.distance_error, self.heading_angle, self.error[2]))
+            self.console.addstr(4,0, "Distance Error: {:.4f}, Heading Angle: {:.2f}, Depth Error: {:.2f}, velocity error: {:.2f}".format(self.distance_error, self.heading_angle, self.error[2], self.error_velocity))
             self.console.addstr(5,0, (""))
             self.console.addstr(6,0, "                   [RPM,  hor,  ver,  vbs,  lcg]")
             self.console.addstr(7,0, "Control Input raw: {}".format(np.array2string(u, precision = 2, floatmode = 'fixed')))
