@@ -50,9 +50,11 @@ class WaypointFollowingController(object):
         self.vel_ref = np.array([self.vel_x_ref, self.vel_y_ref, self.vel_z_ref, self.vel_roll_ref, self.vel_pitch_ref, self.vel_yaw_ref])
 
         # Control Gains
-        self.Kp = np.array([2000, 5, 5, 40, 60])      # P control gain
-        self.Ki = np.array([10., 0.1, 0.1, 0.1, 0.1])    # I control gain
-        self.Kd = np.array([1., 1., 1., 1., 6.])    # D control gain
+        # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
+        # x = [x, y, z, roll, pitch, yaw]
+        self.Kp = np.array([2000, 5, 5, 15, 60])      # P control gain
+        self.Ki = np.array([10., 0.1, 0.1, 0.0015, 0.5])    # I control gain
+        self.Kd = np.array([1., 1., 1., 0., 0.])    # D control gain
         self.Kaw = np.array([1., 1., 1., 1., 6.])   # Anti windup gain
 
         self.eps_depth = 0.4 # offset for depth control
@@ -81,8 +83,8 @@ class WaypointFollowingController(object):
         self.thruster_neutral = 0
         self.horizontal_thrust_vector_neutral = 0.
         self.vertical_thrust_vector_neutral = 0.
-        self.vbs_neutral = 52.
-        self.lcg_neutral = 35.
+        self.vbs_neutral = 50.
+        self.lcg_neutral = 41.
 
         self.u_neutral = np.array([self.thruster_neutral,
                                   self.horizontal_thrust_vector_neutral,
@@ -187,7 +189,7 @@ class WaypointFollowingController(object):
             # since we compare them to sensor data and 
             # therefore need absolute values.
             self.ref[2] = waypoint_euler[2]
-            self.ref[4] = waypoint_euler[4]
+            self.ref[4] = 0.035 #waypoint_euler[4]
 
             # Velocity references
             self.vel_ref[0] = waypoint_ref.twist.twist.linear.x
@@ -241,9 +243,9 @@ class WaypointFollowingController(object):
         lcg.value = int(u[4])
 
         # Publish to actuators
-        self.rpm1_pub.publish(thruster1)
-        self.rpm2_pub.publish(thruster2)
-        self.thrust_vector_pub.publish(vec)
+        # self.rpm1_pub.publish(thruster1)
+        # self.rpm2_pub.publish(thruster2)
+        # self.thrust_vector_pub.publish(vec)
         self.vbs_pub.publish(vbs)
         self.lcg_pub.publish(lcg)
 
@@ -336,14 +338,14 @@ class WaypointFollowingController(object):
         """
         Returns RPM based on the desired velocity in x direction.
         """
-        u = 0
+        u = 0.0
 
-        self.error_velocity_prev = self.error_velocity
-        self.error_velocity = velocity_desired - self.velocity[0]
-        self.error_velocity_integral += self.error_velocity * (1/self.loop_freq)
-        self.error_velocity_deriv = (self.error_velocity - self.error_velocity_prev) * self.loop_freq
+        # self.error_velocity_prev = self.error_velocity
+        # self.error_velocity = velocity_desired - self.velocity[0]
+        # self.error_velocity_integral += self.error_velocity * (1/self.loop_freq)
+        # self.error_velocity_deriv = (self.error_velocity - self.error_velocity_prev) * self.loop_freq
 
-        u = self.Kp[0]*self.error_velocity + self.Ki[0]*(self.error_velocity_integral - self.anti_windup_diff_integral[0]) + self.Kd[0]*self.error_velocity_deriv
+        # u = self.Kp[0]*self.error_velocity + self.Ki[0]*(self.error_velocity_integral - self.anti_windup_diff_integral[0]) + self.Kd[0]*self.error_velocity_deriv
 
         return u
 
@@ -411,7 +413,7 @@ class WaypointFollowingController(object):
             self.console.addstr(1,0, (""))
             self.console.addstr(2,0, "Current States: {}".format(np.array2string(self.state_estimated, precision = 2, suppress_small = True, floatmode = 'fixed')))
             self.console.addstr(3,0, "Reference States: {}".format(np.array2string(self.ref, precision = 2, suppress_small = True, floatmode = 'fixed')))
-            self.console.addstr(4,0, "Distance Error: {:.4f}, Heading Angle: {:.2f}, Depth Error: {:.2f}, velocity error: {:.2f}".format(self.distance_error, self.heading_angle, self.error[2], self.error_velocity))
+            self.console.addstr(4,0, "Distance Error: {:.4f}, Pitch Angle: {:.2f}, Depth Error: {:.2f}, velocity error: {:.2f}".format(self.distance_error, self.error[4], self.error[2], self.error_velocity))
             self.console.addstr(5,0, (""))
             self.console.addstr(6,0, "                   [RPM,  hor,  ver,  vbs,  lcg]")
             self.console.addstr(7,0, "Control Input raw: {}".format(np.array2string(u, precision = 2, floatmode = 'fixed')))
