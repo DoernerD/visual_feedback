@@ -52,10 +52,10 @@ class WaypointFollowingController(object):
         # Control Gains
         # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
         # x = [x, y, z, roll, pitch, yaw]
-        self.Kp = np.array([2000, 5, 5, 15, 60])      # P control gain
-        self.Ki = np.array([10., 0.1, 0.1, 0.0015, 0.5])    # I control gain
+        self.Kp = np.array([2000, 5, 5, 10, 60])      # P control gain
+        self.Ki = np.array([10., 0.1, 0.1, 0.0005, 0.5])    # I control gain
         self.Kd = np.array([1., 1., 1., 0., 0.])    # D control gain
-        self.Kaw = np.array([1., 1., 1., 1., 6.])   # Anti windup gain
+        self.Kaw = np.array([1., 1., 1., 0., 6.])   # Anti windup gain
 
         self.eps_depth = 0.4 # offset for depth control
         self.eps_pitch = 0.2 # offset for pitch control
@@ -83,8 +83,8 @@ class WaypointFollowingController(object):
         self.thruster_neutral = 0
         self.horizontal_thrust_vector_neutral = 0.
         self.vertical_thrust_vector_neutral = 0.
-        self.vbs_neutral = 50.
-        self.lcg_neutral = 41.
+        self.vbs_neutral = 45.
+        self.lcg_neutral = 80.
 
         self.u_neutral = np.array([self.thruster_neutral,
                                   self.horizontal_thrust_vector_neutral,
@@ -189,7 +189,7 @@ class WaypointFollowingController(object):
             # since we compare them to sensor data and 
             # therefore need absolute values.
             self.ref[2] = waypoint_euler[2]
-            self.ref[4] = 0.035 #waypoint_euler[4]
+            self.ref[4] = 0.0 #waypoint_euler[4] # FIXME: Something is off with the sign and potentially the controller. 
 
             # Velocity references
             self.vel_ref[0] = waypoint_ref.twist.twist.linear.x
@@ -340,12 +340,12 @@ class WaypointFollowingController(object):
         """
         u = 0.0
 
-        # self.error_velocity_prev = self.error_velocity
-        # self.error_velocity = velocity_desired - self.velocity[0]
-        # self.error_velocity_integral += self.error_velocity * (1/self.loop_freq)
-        # self.error_velocity_deriv = (self.error_velocity - self.error_velocity_prev) * self.loop_freq
+        self.error_velocity_prev = self.error_velocity
+        self.error_velocity = velocity_desired - self.velocity[0]
+        self.error_velocity_integral += self.error_velocity * (1/self.loop_freq)
+        self.error_velocity_deriv = (self.error_velocity - self.error_velocity_prev) * self.loop_freq
 
-        # u = self.Kp[0]*self.error_velocity + self.Ki[0]*(self.error_velocity_integral - self.anti_windup_diff_integral[0]) + self.Kd[0]*self.error_velocity_deriv
+        u = self.Kp[0]*self.error_velocity + self.Ki[0]*(self.error_velocity_integral - self.anti_windup_diff_integral[0]) + self.Kd[0]*self.error_velocity_deriv
 
         return u
 
