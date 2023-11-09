@@ -11,8 +11,8 @@
 
     <!-- topics, note the root! -->
     <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" />
-    <!-- <arg name="state_estimation_topic" default="/$(arg robot_name)/slam/odom" /> -->
-    <arg name="state_estimation_topic" default="/$(arg robot_name)/dr/odom" />
+    <arg name="state_estimation_topic" default="/$(arg robot_name)/slam/odom" />
+    <!-- <arg name="state_estimation_topic" default="/$(arg robot_name)/dr/odom" /> -->
     <arg name="ref_pose_topic_arg" default="$(arg waypoint_topic_arg)" />
     <arg name="odom_topic_arg" default="/$(arg robot_name)/enu/odom" />
     <arg name="docking_station_pose_topic_arg" default="/$(arg robot_name)/dr/ds_odom"/>

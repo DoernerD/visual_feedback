@@ -40,6 +40,8 @@ class WaypointFollowingController(object):
         self.yaw_ref = 0.
         self.ref = np.array([self.x_ref, self.y_ref, self.z_ref, self.roll_ref, self.pitch_ref, self.yaw_ref])
 
+        self.ref_odom = np.array([0., 0., 0., 0., 0., 0.])
+
         self.velocity = np.array([0., 0., 0., 0., 0., 0.])
         self.vel_x_ref = 0.
         self.vel_y_ref = 0.
@@ -52,13 +54,13 @@ class WaypointFollowingController(object):
         # Control Gains
         # u = [thruster, vec (horizontal), vec (vertical), vbs, lcg]
         # x = [x, y, z, roll, pitch, yaw]
-        self.Kp = np.array([2000, 5, 5, 10, 60])      # P control gain
-        self.Ki = np.array([10., 0.1, 0.1, 0.0005, 0.5])    # I control gain
+        self.Kp = np.array([2000, 5, 5, 10, 70])      # P control gain
+        self.Ki = np.array([10., 0.1, 0.1, 0.001, 0.5])    # I control gain
         self.Kd = np.array([1., 1., 1., 0., 0.])    # D control gain
         self.Kaw = np.array([1., 1., 1., 0., 6.])   # Anti windup gain
 
-        self.eps_depth = 0.4 # offset for depth control
-        self.eps_pitch = 0.2 # offset for pitch control
+        self.eps_depth = 0.6 # offset for depth control
+        self.eps_pitch = 0.3 # offset for pitch control
 
         self.error = np.array([0., 0., 0., 0., 0., 0.])
         self.error_prev = np.array([0., 0., 0., 0., 0., 0.])
@@ -77,13 +79,13 @@ class WaypointFollowingController(object):
         self.error_velocity_deriv = 0.
 
         self.stop_radius = 0.2
-        self.rpm_limit = 250.   # hard rpm limit for safety in the tank
+        self.rpm_limit = 230.   # hard rpm limit for safety in the tank
 
         # Neutral actuator inputs
         self.thruster_neutral = 0
         self.horizontal_thrust_vector_neutral = 0.
         self.vertical_thrust_vector_neutral = 0.
-        self.vbs_neutral = 45.
+        self.vbs_neutral = 57.
         self.lcg_neutral = 80.
 
         self.u_neutral = np.array([self.thruster_neutral,
@@ -126,8 +128,8 @@ class WaypointFollowingController(object):
 
         rospy.logwarn("[WPF]: Controller Initialized")
 
-        if verbose:
-            self.console = curses.initscr()  # initialize is our playground
+        # if verbose:
+        #     self.console = curses.initscr()  # initialize is our playground
 
         # Run
         while not rospy.is_shutdown():
@@ -145,8 +147,8 @@ class WaypointFollowingController(object):
 
             rate.sleep()
 
-        if verbose:
-            curses.endwin()  # return control back to the console
+        # if verbose:
+        #     curses.endwin()  # return control back to the console
 
 
     #region Call-backs
@@ -176,6 +178,9 @@ class WaypointFollowingController(object):
         goal_point.point.x = waypoint_euler[0]
         goal_point.point.y = waypoint_euler[1]
         goal_point.point.z = waypoint_euler[2]
+
+        self.ref_odom = waypoint_euler
+        self.ref_odom[4] = 0.0
 
         try:
             goal_point_local = self.listener.transformPoint(
@@ -243,9 +248,9 @@ class WaypointFollowingController(object):
         lcg.value = int(u[4])
 
         # Publish to actuators
-        # self.rpm1_pub.publish(thruster1)
-        # self.rpm2_pub.publish(thruster2)
-        # self.thrust_vector_pub.publish(vec)
+        self.rpm1_pub.publish(thruster1)
+        self.rpm2_pub.publish(thruster2)
+        self.thrust_vector_pub.publish(vec)
         self.vbs_pub.publish(vbs)
         self.lcg_pub.publish(lcg)
 
@@ -283,9 +288,20 @@ class WaypointFollowingController(object):
         self.integral += self.error * (1/self.loop_freq)
         self.deriv = (self.error - self.error_prev) * self.loop_freq
 
+        # Calculate distance to reference pose
+        # Workaround bc np.sign(0) = 0
+        if np.sign(self.ref[0]) == 0:
+            distance_sign = 1
+        else:
+            distance_sign = np.sign(self.ref[0])
+
+        self.distance_error = np.sqrt(self.ref[0]**2 + self.ref[1]**2) * distance_sign
+
         # When on navigation plane
         if ((np.abs(self.state_estimated[2] - self.ref[2]) <= self.eps_depth)\
                 and (np.abs(self.state_estimated[4] - self.ref[4]) <= self.eps_pitch)):
+
+            # print("velocity control")
 
             # Compute heading angle
             self.heading_angle = math.atan2(self.ref[1], self.ref[0])
@@ -294,24 +310,20 @@ class WaypointFollowingController(object):
             self.heading_angle_error_integral += self.heading_angle_error * (1/self.loop_freq)
             self.heading_angle_error_deriv = (self.heading_angle_error - self.heading_angle_error_prev) * self.loop_freq
 
-            # Calculate distance to reference pose
-            # Workaround bc np.sign(0) = 0
-            if np.sign(self.ref[0]) == 0:
-                distance_sign = 1
-            else:
-                distance_sign = np.sign(self.ref[0])
-
-            self.distance_error = np.sqrt(self.ref[0]**2 + self.ref[1]**2) * distance_sign
-
+            
+            u[0] = 0
             # FIXME: Check the u[1] calculation. Seems sketchy with the flipping and esp. with the integral when you change signs. Not good!
-            if self.distance_error > self.stop_radius:
+            if self.distance_error > 1: #self.stop_radius:
+                print("moving forward")
                 u[0] = self.calculate_velocity_control_action(self.vel_ref[0])
 
                 u[1] = self.Kp[1]*self.heading_angle + self.Ki[1]*(self.heading_angle_error_integral - self.anti_windup_diff_integral[1]) + self.Kd[1]*self.heading_angle_error_deriv   # PID control vectoring (horizontal)
                 u[1] = -u[1] # FIXME: This is a hack to get the sign right. This is due to the conversion from ENU to NED for the thruster commands
 
-            elif self.distance_error < -self.stop_radius:
+            elif self.distance_error < -0.2:    # FIXME: 1m past the waypoint is too much for now to actually stop. Once we have velocity control, we can change it back again.
+                print("Moving backwards")
                 u[0] = self.calculate_velocity_control_action(-0.5*self.vel_ref[0])
+                u[0] = -250
 
                 self.heading_angle_scaled = np.sign(self.heading_angle) * (np.pi - np.abs(self.heading_angle))
 
@@ -319,7 +331,8 @@ class WaypointFollowingController(object):
                 u[1] = -u[1] # FIXME: This is a hack to get the sign right. This is due to the conversion from ENU to NED for the thruster commands
 
             else:
-                u[0] = self.calculate_velocity_control_action(0)
+                print("no rpm")
+                u[0] = 0 #self.calculate_velocity_control_action(0)
 
         u[3] = self.Kp[3]*self.error[2] + self.vbs_neutral + self.Ki[3]*(self.integral[2] - self.anti_windup_diff_integral[3]) + self.Kd[3]*self.deriv[2]   # PID control vbs
         u[4] = self.Kp[4]*self.error[4] + self.lcg_neutral + self.Ki[4]*(self.integral[4] - self.anti_windup_diff_integral[4]) + self.Kd[4]*self.deriv[4]   # PID control lcg
@@ -338,14 +351,14 @@ class WaypointFollowingController(object):
         """
         Returns RPM based on the desired velocity in x direction.
         """
-        u = 0.0
+        u = 250
 
-        self.error_velocity_prev = self.error_velocity
-        self.error_velocity = velocity_desired - self.velocity[0]
-        self.error_velocity_integral += self.error_velocity * (1/self.loop_freq)
-        self.error_velocity_deriv = (self.error_velocity - self.error_velocity_prev) * self.loop_freq
+        # self.error_velocity_prev = self.error_velocity
+        # self.error_velocity = velocity_desired - self.velocity[0]
+        # self.error_velocity_integral += self.error_velocity * (1/self.loop_freq)
+        # self.error_velocity_deriv = (self.error_velocity - self.error_velocity_prev) * self.loop_freq
 
-        u = self.Kp[0]*self.error_velocity + self.Ki[0]*(self.error_velocity_integral - self.anti_windup_diff_integral[0]) + self.Kd[0]*self.error_velocity_deriv
+        # u = self.Kp[0]*self.error_velocity + self.Ki[0]*(self.error_velocity_integral - self.anti_windup_diff_integral[0]) + self.Kd[0]*self.error_velocity_deriv
 
         return u
 
@@ -409,29 +422,29 @@ class WaypointFollowingController(object):
         np.set_printoptions(suppress=True)
         self.limit_output_cnt += 1
         if self.limit_output_cnt % 20 == 1:
-            self.console.addstr(0,0, "All in ENU: [x, y, z, roll, pitch, yaw]")
-            self.console.addstr(1,0, (""))
-            self.console.addstr(2,0, "Current States: {}".format(np.array2string(self.state_estimated, precision = 2, suppress_small = True, floatmode = 'fixed')))
-            self.console.addstr(3,0, "Reference States: {}".format(np.array2string(self.ref, precision = 2, suppress_small = True, floatmode = 'fixed')))
-            self.console.addstr(4,0, "Distance Error: {:.4f}, Pitch Angle: {:.2f}, Depth Error: {:.2f}, velocity error: {:.2f}".format(self.distance_error, self.error[4], self.error[2], self.error_velocity))
-            self.console.addstr(5,0, (""))
-            self.console.addstr(6,0, "                   [RPM,  hor,  ver,  vbs,  lcg]")
-            self.console.addstr(7,0, "Control Input raw: {}".format(np.array2string(u, precision = 2, floatmode = 'fixed')))
-            self.console.addstr(8,0, "Control Input lim: {}".format(np.array2string(u_limited, precision = 2, floatmode = 'fixed')))
-            self.console.addstr(9,0, "Anti Windup Int: {}".format(np.array2string(self.anti_windup_diff_integral, precision = 2, floatmode = 'fixed')))
-            self.console.addstr(10,0, "")
-            self.console.refresh()
-            # print("All in ENU: [x, y, z, roll, pitch, yaw]")
-            # print("")
-            # print("Current States: {}".format(np.array2string(self.state_estimated, precision = 2, suppress_small = True, floatmode = 'fixed')))
-            # print("Reference States: {}".format(np.array2string(self.ref, precision = 2, suppress_small = True, floatmode = 'fixed')))
-            # print("Distance Error: {:.4f}, Heading Angle: {:.2f}, Depth Error: {:.2f}".format(self.distance_error, self.heading_angle, self.error[2]))
-            # print("")
-            # print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
-            # print("Control Input raw: {}".format(np.array2string(u, precision = 2, floatmode = 'fixed')))
-            # print("Control Input lim: {}".format(np.array2string(u_limited, precision = 2, floatmode = 'fixed')))
-            # print("Anti Windup Int: {}".format(np.array2string(self.anti_windup_diff_integral, precision = 2, floatmode = 'fixed')))
-            # print("-----")
+            # self.console.addstr(0,0, "All in ENU: [x, y, z, roll, pitch, yaw]")
+            # self.console.addstr(1,0, (""))
+            # self.console.addstr(2,0, "Current States: {}".format(np.array2string(self.state_estimated, precision = 2, suppress_small = True, floatmode = 'fixed')))
+            # self.console.addstr(3,0, "Reference States: {}".format(np.array2string(self.ref_odom, precision = 2, suppress_small = True, floatmode = 'fixed')))
+            # self.console.addstr(4,0, "Distance Error: {:.4f}, Pitch Angle: {:.2f}, Depth Error: {:.2f}, velocity error: {:.2f}".format(self.distance_error, self.error[4], self.error[2], self.error_velocity))
+            # self.console.addstr(5,0, (""))
+            # self.console.addstr(6,0, "                   [RPM,  hor,  ver,  vbs,  lcg]")
+            # self.console.addstr(7,0, "Control Input raw: {}".format(np.array2string(u, precision = 2, floatmode = 'fixed')))
+            # self.console.addstr(8,0, "Control Input lim: {}".format(np.array2string(u_limited, precision = 2, floatmode = 'fixed')))
+            # self.console.addstr(9,0, "Anti Windup Int: {}".format(np.array2string(self.anti_windup_diff_integral, precision = 2, floatmode = 'fixed')))
+            # self.console.addstr(10,0, "")
+            # self.console.refresh()
+            print("All in ENU: [x, y, z, roll, pitch, yaw]")
+            print("")
+            print("Current States: {}".format(np.array2string(self.state_estimated, precision = 2, suppress_small = True, floatmode = 'fixed')))
+            print("Reference States: {}".format(np.array2string(self.ref_odom, precision = 2, suppress_small = True, floatmode = 'fixed')))
+            print("Distance Error: {:.4f}, Pitch Angle: {:.2f}, Heading Angle: {:.2f}, Depth Error: {:.2f}".format(self.distance_error, self.error[4], self.heading_angle, self.error[2]))
+            print("")
+            print("[thruster, vec (horizontal), vec (vertical), vbs, lcg]")
+            print("Control Input raw: {}".format(np.array2string(u, precision = 2, floatmode = 'fixed')))
+            print("Control Input lim: {}".format(np.array2string(u_limited, precision = 2, floatmode = 'fixed')))
+            print("Anti Windup Int: {}".format(np.array2string(self.anti_windup_diff_integral, precision = 2, floatmode = 'fixed')))
+            print("-----")
 
 
 if __name__ == "__main__":
