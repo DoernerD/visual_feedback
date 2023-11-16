@@ -418,7 +418,6 @@ class WaypointFollowingController(object):
         Using the curses package, we can overwrite the console output. Is a bit weird when we have
         other cli outputs, too, but makes looking at the control stuff a lot easier.
         """
-        # FIXME: Get the useful stuff for the print, right now they might not make sense.
         np.set_printoptions(suppress=True)
         self.limit_output_cnt += 1
         if self.limit_output_cnt % 20 == 1:
