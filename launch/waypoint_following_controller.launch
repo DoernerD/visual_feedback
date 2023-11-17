@@ -10,12 +10,8 @@
 
 
     <!-- topics, note the root! -->
-    <arg name="state_feedback_topic" default="/$(arg robot_name)/dr/odom" />
     <arg name="state_estimation_topic" default="/$(arg robot_name)/slam/odom" />
-    <!-- <arg name="state_estimation_topic" default="/$(arg robot_name)/dr/odom" /> -->
     <arg name="ref_pose_topic_arg" default="$(arg waypoint_topic_arg)" />
-    <arg name="odom_topic_arg" default="/$(arg robot_name)/enu/odom" />
-    <arg name="docking_station_pose_topic_arg" default="/$(arg robot_name)/dr/ds_odom"/>
 
     <arg name="vbs_topic_arg" default="/$(arg robot_name)/core/vbs_cmd" />
     <arg name="lcg_topic_arg" default="/$(arg robot_name)/core/lcg_cmd" />
@@ -41,6 +37,13 @@
         <param name="rpm_topic_1" value="$(arg rpm_topic_1_arg)" />
         <param name="rpm_topic_2" value="$(arg rpm_topic_2_arg)" />
         <param name="thrust_vector_cmd_topic" value="$(arg thrust_vector_cmd_topic_arg)" />
+
+        <!-- Publish Convenience Topics -->
+        <param name="ref_topic" value="/$(arg robot_name)/ctrl/setpoint" />
+        <param name="error_topic" value="/$(arg robot_name)/ctrl/error" />
+        <param name="state_topic" value="/$(arg robot_name)/ctrl/state" />
+        <param name="control_input_topic" value="/$(arg robot_name)/ctrl/control_input" />
+        <param name="control_neutral_topic" value="/$(arg robot_name)/ctrl/control_neutral" />
     </node>
 
 </launch>

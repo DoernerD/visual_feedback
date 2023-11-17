@@ -16,6 +16,7 @@ from sam_msgs.msg import ThrusterAngles, PercentStamped
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseWithCovarianceStamped, PointStamped
 from smarc_msgs.msg import ThrusterRPM
+from visual_feedback.msg import ControlState, ControlInput, ControlError
 
 
 class WaypointFollowingController(object):
@@ -109,6 +110,12 @@ class WaypointFollowingController(object):
         ref_pose_topic = rospy.get_param("~ref_pose_topic")
         state_estimate_topic = rospy.get_param("~state_estimation_topic")
 
+        state_topic = rospy.get_param("~state_topic")
+        ref_topic = rospy.get_param("~ref_topic")
+        error_topic = rospy.get_param("~error_topic")
+        control_input_topic = rospy.get_param("~control_input_topic")
+        control_neutral_topic = rospy.get_param("~control_neutral_topic")
+
         # Subscribers to state feedback, setpoints and enable flags
         rospy.Subscriber(ref_pose_topic, Odometry, self.waypoint_callback, queue_size=1)
         rospy.Subscriber(state_estimate_topic, Odometry, self.estimation_callback, queue_size=1)
@@ -120,7 +127,14 @@ class WaypointFollowingController(object):
         self.vbs_pub = rospy.Publisher(vbs_topic, PercentStamped, queue_size=10)
         self.lcg_pub = rospy.Publisher(lcg_topic, PercentStamped, queue_size=10)
 
-        # TF tree listener        
+        # Convenience topics
+        self.state_pub = rospy.Publisher(state_topic, ControlState, queue_size=1)
+        self.ref_pub = rospy.Publisher(ref_topic, ControlState, queue_size=1)
+        self.error_pub = rospy.Publisher(error_topic, ControlError, queue_size=1)
+        self.control_input_pub = rospy.Publisher(control_input_topic, ControlInput, queue_size=1)
+        self.control_neutral_pub = rospy.Publisher(control_neutral_topic, ControlInput, queue_size=1)
+
+        # TF tree listener
         self.listener = tf.TransformListener()
         self.base_frame = 'sam/base_link'
 
@@ -141,6 +155,8 @@ class WaypointFollowingController(object):
             self.compute_anti_windup(u, u_limited)
 
             self.publish_control_action(u_limited)
+
+            self.publish_convenience_topics(u_limited)
 
             if verbose:
                 self.print_states(u, u_limited)
@@ -254,6 +270,79 @@ class WaypointFollowingController(object):
         self.vbs_pub.publish(vbs)
         self.lcg_pub.publish(lcg)
 
+
+    def publish_convenience_topics(self, u):
+        """
+        Publish convenience topics for plotting and debugging.
+        """
+        # Publish reference
+        ref_msg = ControlState()
+        ref_msg.pose.x = self.ref_odom[0]
+        ref_msg.pose.y = self.ref_odom[1]
+        ref_msg.pose.z = self.ref_odom[2]
+        ref_msg.pose.roll = self.ref_odom[3]
+        ref_msg.pose.pitch = self.ref_odom[4]
+        ref_msg.pose.yaw = self.ref_odom[5]
+
+        ref_msg.vel.x = self.vel_ref[0]
+        ref_msg.vel.y = self.vel_ref[1]
+        ref_msg.vel.z = self.vel_ref[2]
+        ref_msg.vel.roll = self.vel_ref[3]
+        ref_msg.vel.pitch = self.vel_ref[4]
+        ref_msg.vel.yaw = self.vel_ref[5]
+
+        self.ref_pub.publish(ref_msg)
+
+        # Publish current state
+        state_msg = ControlState()
+        state_msg.pose.x = self.state_estimated[0]
+        state_msg.pose.y = self.state_estimated[1]
+        state_msg.pose.z = self.state_estimated[2]
+        state_msg.pose.roll = self.state_estimated[3]
+        state_msg.pose.pitch = self.state_estimated[4]
+        state_msg.pose.yaw = self.state_estimated[5]
+
+        state_msg.vel.x = self.velocity[0]
+        state_msg.vel.y = self.velocity[1]
+        state_msg.vel.z = self.velocity[2]
+        state_msg.vel.roll = self.velocity[3]
+        state_msg.vel.pitch = self.velocity[4]
+        state_msg.vel.yaw = self.velocity[5]
+
+        self.state_pub.publish(state_msg)
+
+        # Publish error
+        error_msg = ControlError()
+        error_msg.x = self.error[0]
+        error_msg.y = self.error[1]
+        error_msg.z = self.error[2]
+        error_msg.roll = self.error[3]
+        error_msg.pitch = self.error[4]
+        error_msg.yaw = self.error[5]
+        error_msg.heading = self.heading_angle
+        error_msg.distance = self.distance_error
+
+        self.error_pub.publish(error_msg)
+
+        # Publish control input
+        control_input_msg = ControlInput()
+        control_input_msg.thrusterRPM = u[0]
+        control_input_msg.thrusterHorizontal = u[1]
+        control_input_msg.thusterVertical = u[2]
+        control_input_msg.vbs = u[3]
+        control_input_msg.lcg = u[4]
+
+        self.control_input_pub.publish(control_input_msg)
+        
+        # Publish neutral control input
+        control_neutral_msg = ControlInput()
+        control_neutral_msg.thrusterRPM = self.u_neutral[0]
+        control_neutral_msg.thrusterHorizontal = self.u_neutral[1]
+        control_neutral_msg.thusterVertical = self.u_neutral[2]
+        control_neutral_msg.vbs = self.u_neutral[3]
+        control_neutral_msg.lcg = self.u_neutral[4]
+
+        self.control_neutral_pub.publish(control_neutral_msg)
     #endregion
 
 
@@ -314,14 +403,12 @@ class WaypointFollowingController(object):
             u[0] = 0
             # FIXME: Check the u[1] calculation. Seems sketchy with the flipping and esp. with the integral when you change signs. Not good!
             if self.distance_error > 1: #self.stop_radius:
-                print("moving forward")
                 u[0] = self.calculate_velocity_control_action(self.vel_ref[0])
 
                 u[1] = self.Kp[1]*self.heading_angle + self.Ki[1]*(self.heading_angle_error_integral - self.anti_windup_diff_integral[1]) + self.Kd[1]*self.heading_angle_error_deriv   # PID control vectoring (horizontal)
                 u[1] = -u[1] # FIXME: This is a hack to get the sign right. This is due to the conversion from ENU to NED for the thruster commands
 
             elif self.distance_error < -0.2:    # FIXME: 1m past the waypoint is too much for now to actually stop. Once we have velocity control, we can change it back again.
-                print("Moving backwards")
                 u[0] = self.calculate_velocity_control_action(-0.5*self.vel_ref[0])
                 u[0] = -250
 
@@ -331,7 +418,6 @@ class WaypointFollowingController(object):
                 u[1] = -u[1] # FIXME: This is a hack to get the sign right. This is due to the conversion from ENU to NED for the thruster commands
 
             else:
-                print("no rpm")
                 u[0] = 0 #self.calculate_velocity_control_action(0)
 
         u[3] = self.Kp[3]*self.error[2] + self.vbs_neutral + self.Ki[3]*(self.integral[2] - self.anti_windup_diff_integral[3]) + self.Kd[3]*self.deriv[2]   # PID control vbs

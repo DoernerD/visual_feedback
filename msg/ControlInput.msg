@@ -1,0 +1,5 @@
+float64 thrusterRPM
+float64 thusterVertical
+float64 thrusterHorizontal
+float64 vbs
+float64 lcg
